@@ -140,6 +140,7 @@ def train(
         steps_done = 0
 
         for i_episode in range(num_episodes):
+            logging.info(f"--- Starting Episode {i_episode + 1}/{num_episodes} ---")
             policy_net.train()
             state, _ = train_env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
@@ -148,6 +149,10 @@ def train(
                 sample = random.random()
                 eps_threshold = config['eps_end'] + (config['eps_start'] - config['eps_end']) * math.exp(-1. * steps_done / final_hyperparams['eps_decay'])
                 steps_done += 1
+
+                # Log progress every 500 steps to give feedback during long training runs
+                if train_env.current_step % 500 == 0:
+                    logging.info(f"  [Episode {i_episode + 1}] Step {train_env.current_step}/{len(train_env.features_df)}...")
                 
                 if sample > eps_threshold:
                     with torch.no_grad():
