@@ -8,11 +8,11 @@ cat <<EOF > config.yaml
 # Configuration for the Reinforcement Learning Game Agent
 # --- File Paths ---
 # Relative to the reinforcement-learning-game-agent directory
-data_path: "data/databaru_from_api.csv"
-model_dir: "model/"
+data_path: "gs://proyek-training-model-rl/data/databaru_from_api.csv"
+model_dir: "gs://proyek-training-model-rl/model/"
 best_model_name: "best_tuned_model.pth"
 scaler_name: "feature_scaler.joblib"
-log_dir: "logs/"
+log_dir: "gs://proyek-training-model-rl/logs/"
 mlflow_dir: "mlruns/"
 
 # --- Environment and Model Parameters ---
