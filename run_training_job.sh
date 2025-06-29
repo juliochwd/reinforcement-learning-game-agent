@@ -29,14 +29,14 @@ transaction_cost: 1.0e-4      # Cost per transaction.
 
 # --- Training Parameters ---
 # For Optuna Hyperparameter Search
-n_trials: 50
-num_episodes_trial: 50 # Episodes per Optuna trial
+n_trials: 15
+num_episodes_trial: 20 # Episodes per Optuna trial
 eval_every: 5
 target_update_frequency: 10 # How many episodes before updating the target network
 early_stopping_patience: 5  # How many validation checks without improvement before stopping
 
 # For Final Model Training
-num_episodes_final: 100 # Episodes for training the final best model
+num_episodes_final: 50 # Episodes for training the final best model
 
 # --- Replay Memory ---
 memory_size: 50000 # Increased memory size for PER to be more effective
