@@ -39,8 +39,8 @@ class TradingEnv(gym.Env):
         if not features_df.index.equals(targets_df.index):
             raise ValueError("Indeks Features dan Targets harus selaras.")
 
-        self.features_df = features_df.copy()
-        self.targets_df = targets_df.copy()
+        self.features_df = features_df
+        self.targets_df = targets_df
         
         self.features_per_step = len(self.features_df.columns)
         
