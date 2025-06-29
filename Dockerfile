@@ -7,6 +7,12 @@ WORKDIR /app
 # Menyalin hanya requirements.txt terlebih dahulu untuk caching
 COPY requirements.txt .
 
+# Perbarui apt dan instal JDK
+RUN apt-get update && apt-get install -y openjdk-11-jdk --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
+# Instal Cython dan wheel
+RUN pip install cython wheel
+
 # Menginstal dependensi, termasuk torch yang besar
 RUN pip install --no-cache-dir --timeout=600 -r requirements.txt
 
