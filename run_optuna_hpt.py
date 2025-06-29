@@ -87,13 +87,19 @@ def main():
     """
     best_params = run_hyperparameter_tuning()
     if best_params:
-        print("\n" + "="*40)
-        print("To train the final model with these parameters, run:")
-        best_params_str = " ".join([f"--{key}={value}" for key, value in best_params.items()])
-        # Suggest using the full training episode count from config
-        num_episodes_full = config.get('num_episodes_full', 500)
-        print(f"python src/rl_agent/train.py {best_params_str} --num_episodes={num_episodes_full}")
-        print("="*40)
+        logging.info("\n" + "="*40)
+        logging.info("Hyperparameter tuning complete. Starting final model training.")
+        logging.info(f"Best parameters found: {best_params}")
+        logging.info("="*40)
+
+        # Train the final model with the best parameters
+        final_episodes = config.get('num_episodes_final', 100)
+        train(
+            **best_params,
+            num_episodes=final_episodes,
+            save_model=True
+        )
+        logging.info("Final model training finished.")
 
 if __name__ == "__main__":
     main()

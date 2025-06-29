@@ -4,7 +4,4 @@ Rekomendasi Kunci: Untuk mengatasi risiko tersebut dan memperkuat solusi Anda, r
 
 set PHONE_NUMBER=82284608240& set PASSWORD=Dh4910va& python api_scraper.py
 
-docker build . -t asia-southeast1-docker.pkg.dev/gen-lang-client-0755857756/rl-agent-repo/rl-game-agent:latest
-
-
-docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0755857756/rl-agent-repo/rl-game-agent:latest
+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
