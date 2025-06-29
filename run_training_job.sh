@@ -8,7 +8,7 @@ cat <<EOF > config.yaml
 # Configuration for the Reinforcement Learning Game Agent
 # --- File Paths ---
 # Relative to the reinforcement-learning-game-agent directory
-data_path: "data/databaru_from_api.csv"
+data_path: "data/"
 model_dir: "model/"
 best_model_name: "best_tuned_model.pth"
 scaler_name: "feature_scaler.joblib"
