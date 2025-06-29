@@ -20,7 +20,15 @@ def download_from_gcs(gcs_path, local_path):
         if blob.name.endswith('/'):
             continue
             
-        destination_file_path = os.path.join(local_path, os.path.relpath(blob.name, blob_prefix))
+        # Calculate relative path to preserve directory structure in the download destination
+        relative_path = os.path.relpath(blob.name, blob_prefix)
+        
+        # If the blob is the single file specified, relpath will be '.',
+        # so we should use the blob's basename instead to form a valid file path.
+        if relative_path == '.':
+            destination_file_path = os.path.join(local_path, os.path.basename(blob.name))
+        else:
+            destination_file_path = os.path.join(local_path, relative_path)
         os.makedirs(os.path.dirname(destination_file_path), exist_ok=True)
         
         print(f"Downloading {blob.name} to {destination_file_path}...")
