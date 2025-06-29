@@ -99,7 +99,7 @@ def train(
 
         try:
             # Use local paths for processing
-            data_file = os.path.join(local_data_path, os.path.basename(original_data_path))
+            data_file = local_data_path
             scaler_path = os.path.join(local_model_dir, config['scaler_name'])
             
             train_X, train_y, val_X, val_y, _, _ = prepare_data_splits(

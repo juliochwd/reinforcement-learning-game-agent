@@ -5,4 +5,8 @@ Rekomendasi Kunci: Untuk mengatasi risiko tersebut dan memperkuat solusi Anda, r
 set PHONE_NUMBER=82284608240& set PASSWORD=Dh4910va& python api_scraper.py
 
 
-cd reinforcement-learning-game-agent
+cd reinforcement-learning-game-agent 
+
+bash run_training_job.sh
+nohup bash run_training_job.sh &
+tail -f -n 100 nohup.out
