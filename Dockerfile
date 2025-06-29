@@ -34,4 +34,4 @@ RUN useradd -m appuser
 USER appuser
 
 # Menetapkan entrypoint
-ENTRYPOINT ["python", "-m"]
+ENTRYPOINT ["python"]

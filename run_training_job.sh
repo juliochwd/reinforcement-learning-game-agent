@@ -181,7 +181,7 @@ echo "=================================================="
 # Pastikan file config.yaml Anda sudah diatur untuk menunjuk ke path GCS.
 docker run --rm \
     $IMAGE_NAME \
-    python -m train_pipeline
+    -m train_pipeline
 
 echo "=================================================="
 echo "Training job selesai."
