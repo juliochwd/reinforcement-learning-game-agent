@@ -16,7 +16,7 @@ log_dir: "gs://proyek-training-model-rl/logs/"
 mlflow_dir: "mlruns/"
 
 # --- Environment and Model Parameters ---
-window_size: 30
+window_size: 10
 features_per_step: 29 # This value is now dynamically determined by feature_engineering.py
 bet_percentages: [0.01, 0.025] # The bet sizes available to the agent.
 
@@ -29,17 +29,17 @@ transaction_cost: 1.0e-4      # Cost per transaction.
 
 # --- Training Parameters ---
 # For Optuna Hyperparameter Search
-n_trials: 15
-num_episodes_trial: 20 # Episodes per Optuna trial
+n_trials: 3
+num_episodes_trial: 5 # Episodes per Optuna trial
 eval_every: 5
 target_update_frequency: 10 # How many episodes before updating the target network
 early_stopping_patience: 5  # How many validation checks without improvement before stopping
 
 # For Final Model Training
-num_episodes_final: 50 # Episodes for training the final best model
+num_episodes_final: 10 # Episodes for training the final best model
 
 # --- Replay Memory ---
-memory_size: 10000 # Increased memory size for PER to be more effective
+memory_size: 5000 # Increased memory size for PER to be more effective
 
 # --- Hyperparameter Search Space (for Optuna) ---
 # These are the ranges Optuna will search within.
@@ -54,7 +54,7 @@ hyperparameters:
   dropout_rate:
     low: 0.1
     high: 0.5
-  batch_size: [32, 64]
+  batch_size: [64]
   eps_decay:
     low: 1000
     high: 5000
