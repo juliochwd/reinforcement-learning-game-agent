@@ -12,7 +12,7 @@ jnius==1.1.0
 joblib==1.4.2
 keyring==25.6.0
 matplotlib==3.8.4
-numpy==2.3.1
+numpy
 optuna==4.1.0
 pandas==2.3.0
 Pillow==11.2.1
