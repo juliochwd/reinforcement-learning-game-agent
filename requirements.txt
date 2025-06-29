@@ -27,8 +27,6 @@ selenium_wire
 setuptools
 Sphinx
 statsmodels
-thread
 torch
 urllib3_secure_extra
-xmlrpclib
 zstandard
