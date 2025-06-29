@@ -29,11 +29,11 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 # Menyalin kode aplikasi Anda
 COPY . .
 
-# Memberikan kepemilikan ke appuser
-RUN chown -R appuser:appuser /app
-
 # Membuat pengguna non-root untuk keamanan
 RUN useradd -m appuser
+
+# Memberikan kepemilikan ke appuser
+RUN chown -R appuser:appuser /app
 USER appuser
 
 # Menetapkan entrypoint
