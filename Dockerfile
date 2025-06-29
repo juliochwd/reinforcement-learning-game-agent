@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Perbarui apt dan instal JDK
-RUN apt-get update && apt-get install -y openjdk-11-jdk --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openjdk-17-jdk --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Instal Cython dan wheel
 RUN pip install cython wheel
