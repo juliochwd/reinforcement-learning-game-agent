@@ -6,7 +6,7 @@ filelock
 gymnasium
 ipython
 ipywidgets
-jnius==1.6.1
+jnius
 joblib
 keyring
 matplotlib

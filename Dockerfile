@@ -1,6 +1,6 @@
 # ---- Tahap 1: Builder ----
 # Menggunakan image Python penuh untuk menginstal dependensi
-FROM python:3.10 AS builder
+FROM python:3.11 AS builder
 
 WORKDIR /app
 
@@ -19,12 +19,12 @@ RUN pip install --no-cache-dir --timeout=600 -r requirements.txt
 
 # ---- Tahap 2: Final ----
 # Memulai dari image slim yang jauh lebih kecil
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # Menyalin HANYA paket yang terinstal dari tahap builder, bukan file cache atau installer
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
 # Menyalin kode aplikasi Anda
 COPY . .
