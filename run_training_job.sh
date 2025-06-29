@@ -31,10 +31,10 @@ echo "=================================================="
 echo "Menjalankan training job di dalam container Docker..."
 echo "=================================================="
 
-# Menjalankan container dengan akses GPU dan menghapusnya setelah selesai.
+# Menjalankan container dan menghapusnya setelah selesai.
 # Kode Python di dalam container sekarang bertanggung jawab untuk menangani path GCS.
 # Pastikan file config.yaml Anda sudah diatur untuk menunjuk ke path GCS.
-docker run --rm --gpus all \
+docker run --rm \
     $IMAGE_NAME \
     python src/rl_agent/train.py
 
