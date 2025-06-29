@@ -39,7 +39,7 @@ early_stopping_patience: 5  # How many validation checks without improvement bef
 num_episodes_final: 50 # Episodes for training the final best model
 
 # --- Replay Memory ---
-memory_size: 50000 # Increased memory size for PER to be more effective
+memory_size: 10000 # Increased memory size for PER to be more effective
 
 # --- Hyperparameter Search Space (for Optuna) ---
 # These are the ranges Optuna will search within.
@@ -50,7 +50,7 @@ hyperparameters:
   gamma:
     low: 0.9
     high: 0.999
-  hidden_size: [128, 256]
+  hidden_size: [128]
   dropout_rate:
     low: 0.1
     high: 0.5
