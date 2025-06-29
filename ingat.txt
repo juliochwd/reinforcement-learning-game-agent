@@ -1,0 +1,10 @@
+Risiko Utama: Tantangan terbesar yang diidentifikasi adalah non-stationarity, yaitu kemungkinan bahwa pola atau "aturan" permainan dapat berubah. Model RL yang dilatih pada data lama mungkin tidak berkinerja baik jika dinamika permainan bergeser.
+Rekomendasi Kunci: Untuk mengatasi risiko tersebut dan memperkuat solusi Anda, rekomendasi utamanya adalah menerapkan pipeline MLOps yang memungkinkan pelatihan ulang (retraining) secara berkala. Ini memastikan agen Anda terus beradaptasi dengan data dan pola terbaru.
+
+
+set PHONE_NUMBER=82284608240& set PASSWORD=Dh4910va& python api_scraper.py
+
+docker build . -t asia-southeast1-docker.pkg.dev/gen-lang-client-0755857756/rl-agent-repo/rl-game-agent:latest
+
+
+docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0755857756/rl-agent-repo/rl-game-agent:latest

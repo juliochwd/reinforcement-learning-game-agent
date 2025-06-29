@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# Documentation & Notebooks
+*.md
+notebooks/
+refactoring_plan.md
+PANDUAN_GCLOUD.md
+
+# Local data, models, and logs (these should be in GCS)
+data/
+models/
+logs/
+*.png
+*.csv
+*.xlsx
+*.joblib
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
