@@ -6,7 +6,6 @@ filelock
 gymnasium
 ipython
 ipywidgets
-jnius
 joblib
 keyring
 matplotlib
