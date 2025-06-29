@@ -150,3 +150,9 @@ logs/
 
 # Ignore MLflow tracking data
 mlruns/
+
+
+# Ignore sensitive files and backups
+ingat.txt
+ingat.txt.bak
+*.bak
