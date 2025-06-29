@@ -1,14 +1,12 @@
 attr
 colorama
-ConfigParser
 cryptography
 docutils
 filelock
 gymnasium
-HTMLParser
 ipython
 ipywidgets
-jnius
+jnius==1.6.1
 joblib
 keyring
 matplotlib
