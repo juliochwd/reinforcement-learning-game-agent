@@ -1,5 +1,7 @@
 import logging
 import yaml
+import json
+import os
 
 # Impor fungsi yang diperlukan
 from run_optuna_hpt import run_hyperparameter_tuning
@@ -37,6 +39,17 @@ def main():
     
     logging.info("--- Selesai: Hyperparameter Tuning ---")
     logging.info(f"Parameter terbaik yang ditemukan: {best_params}")
+
+    # Menyimpan hyperparameter terbaik ke file
+    try:
+        model_dir = config.get('model_dir', 'models')
+        os.makedirs(model_dir, exist_ok=True)
+        hyperparams_path = os.path.join(model_dir, 'best_hyperparameters.json')
+        logging.info(f"Menyimpan hyperparameter terbaik ke {hyperparams_path}")
+        with open(hyperparams_path, 'w') as f:
+            json.dump(best_params, f, indent=4)
+    except Exception as e:
+        logging.error(f"Gagal menyimpan hyperparameter: {e}")
 
     # --- Langkah 2: Pelatihan Model Akhir ---
     logging.info("--- Memulai Langkah 2: Pelatihan Model Akhir ---")
