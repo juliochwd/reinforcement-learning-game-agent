@@ -126,11 +126,59 @@ class TaskOrchestrator:
             return
 
         try:
+            # Upload the new pipeline script first
+            scp_command = [
+                'scp',
+                '-i', vm_config['ssh_key_path'],
+                'pipeline.sh',
+                f"{vm_config['user']}@{vm_config['host']}:{vm_config['remote_script_path']}"
+            ]
+            logging.info(f"Uploading pipeline script: {' '.join(scp_command)}")
+            subprocess.run(scp_command, check=True)
+
+            # A more robust command to ensure Python 3.12 is installed and used.
+            remote_command = f"""
+DEBIAN_FRONTEND=noninteractive
+PYTHON_VERSION="3.12.6"
+PYTHON_MAJOR="3.12"
+REMOTE_PROJECT_PATH="{os.path.dirname(vm_config['remote_script_path'])}"
+
+# Check if Python 3.12 is already installed
+if ! command -v python$PYTHON_MAJOR &> /dev/null; then
+    echo "Python $PYTHON_MAJOR not found. Installing..."
+    
+    # Update and install build dependencies
+    sudo apt-get update -y
+    sudo apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget libbz2-dev
+    
+    # Download, compile, and install Python
+    wget "https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz"
+    tar -xf "Python-$PYTHON_VERSION.tgz"
+    cd "Python-$PYTHON_VERSION"
+    ./configure --enable-optimizations
+    make -j$(nproc)
+    sudo make altinstall
+    cd ..
+    rm -rf "Python-$PYTHON_VERSION" "Python-$PYTHON_VERSION.tgz"
+    
+    # Install pip for the new version
+    wget https://bootstrap.pypa.io/get-pip.py
+    sudo python$PYTHON_MAJOR get-pip.py
+    rm get-pip.py
+else
+    echo "Python $PYTHON_MAJOR is already installed."
+fi
+
+# Now, execute the pipeline script using the correct python version
+# The pipeline script should be modified to use `python3.12`
+cd $REMOTE_PROJECT_PATH && bash pipeline.sh
+"""
+            
             ssh_command = [
                 'ssh',
                 '-i', vm_config['ssh_key_path'],
                 f"{vm_config['user']}@{vm_config['host']}",
-                f"bash {vm_config['remote_script_path']}"
+                remote_command
             ]
             
             logging.info(f"Executing command: {' '.join(ssh_command)}")
@@ -142,7 +190,9 @@ class TaskOrchestrator:
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='replace'
             )
 
             # Log stdout
