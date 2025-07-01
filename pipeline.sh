@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x # Enable debugging
 
 # --- Variables ---
 PYTHON_CMD="python3.12"
@@ -37,16 +38,19 @@ fi
 echo "--> Activating virtual environment for script execution..."
 source "$VENV_DIR/bin/activate"
 
+echo "--- Checking Python path after activation ---"
+which $PYTHON_CMD || echo "WARNING: $PYTHON_CMD not found in PATH after activation."
+
 # --- Run Hyperparameter Tuning ---
 echo "--> STAGE 1: Running Hyperparameter Search..."
 # The python script is expected to print its own PROGRESS updates
-python "$PROJECT_DIR/src/rl_agent/hyperparameter_search.py"
+$PYTHON_CMD "$PROJECT_DIR/src/rl_agent/hyperparameter_search.py"
 echo "PROGRESS: 80%"
 
 # --- Run Final Model Training ---
 echo "--> STAGE 2: Running Final Model Training..."
 # The python script is expected to print its own PROGRESS updates
-python "$PROJECT_DIR/train_final_model.py"
+$PYTHON_CMD "$PROJECT_DIR/train_final_model.py"
 echo "PROGRESS: 100%"
 
 # --- Deactivate ---
