@@ -63,14 +63,17 @@ def create_features(df):
     for lag in [1, 2, 3, 5, 10]:
         features[f'lag_last_digit_{lag}'] = df['last_digit'].shift(lag)
 
-    # Fitur Rolling Window (Agregasi Jendela Geser)
+    # Fitur Rolling Window (Agregasi Jendela Geser) - DIOPTIMALKAN
+    shifted_data = df['last_digit'].shift(1)
     for window in [3, 5, 10, 30]:
-        shifted_data = df['last_digit'].shift(1)
-        # 'closed="left"' tidak lagi diperlukan karena kita sudah menggeser secara manual
-        features[f'rolling_mean_{window}'] = shifted_data.rolling(window=window).mean()
-        features[f'rolling_std_{window}'] = shifted_data.rolling(window=window).std()
-        features[f'rolling_min_{window}'] = shifted_data.rolling(window=window).min()
-        features[f'rolling_max_{window}'] = shifted_data.rolling(window=window).max()
+        # Buat objek rolling HANYA SEKALI per jendela untuk efisiensi
+        rolling_window = shifted_data.rolling(window=window)
+        
+        # Hitung semua agregasi dari objek yang sama untuk menghindari perhitungan ulang
+        features[f'rolling_mean_{window}'] = rolling_window.mean()
+        features[f'rolling_std_{window}'] = rolling_window.std()
+        features[f'rolling_min_{window}'] = rolling_window.min()
+        features[f'rolling_max_{window}'] = rolling_window.max()
 
     # Fitur Frekuensi & Momentum
     for window in [3, 10, 30]:
