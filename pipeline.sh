@@ -3,7 +3,8 @@ set -e
 set -x # Enable debugging
 
 # --- Variables ---
-PYTHON_CMD="python3.12"
+# Use the pre-installed, optimized Python 3.10 on the Deep Learning VM image
+PYTHON_CMD="python3.10"
 PROJECT_DIR=$(dirname "$(readlink -f "$0")")
 VENV_DIR="$PROJECT_DIR/venv"
 
@@ -19,7 +20,11 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 
 # --- Virtual Environment Setup ---
-# Simple check: if venv doesn't exist, create it.
+# We force a rebuild to ensure it uses the correct python3.10 interpreter
+# and installs the correct package entry points.
+echo "--> Forcing venv rebuild to use the VM's native Python 3.10"
+rm -rf "$VENV_DIR"
+
 if [ ! -d "$VENV_DIR" ]; then
     echo "--> Creating and setting up a fresh virtual environment..."
     echo "PROGRESS: 10%"
