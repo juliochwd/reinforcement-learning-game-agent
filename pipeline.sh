@@ -26,6 +26,8 @@ if [ ! -d "$VENV_DIR" ]; then
     pip install --upgrade pip
     echo "PROGRESS: 30%"
     pip install -r "$PROJECT_DIR/requirements.txt"
+    echo "--> Installing project in editable mode..."
+    pip install -e .
     # Deactivate after setup is complete
     deactivate
     echo "PROGRESS: 50%"
