@@ -23,9 +23,9 @@ transaction_cost: 1.0e-4
 sac_hyperparameters:
   # --- Parameter Tetap untuk Pelatihan ---
   total_timesteps: 50000         # Total langkah untuk satu sesi pelatihan
-  total_timesteps_final: 100000   # Total langkah untuk pelatihan model final
+  total_timesteps_final: 200000   # Total langkah untuk pelatihan model final
   total_timesteps_trial: 20000    # Langkah per trial untuk HPT
-  buffer_size: 50000
+  buffer_size: 1000000
   learning_starts: 5000
   eval_freq: 10000
   early_stopping_patience: 5
@@ -34,7 +34,7 @@ sac_hyperparameters:
   n_jobs: -1 # -1 untuk menggunakan semua core CPU yang tersedia
 
   # --- Ruang Pencarian untuk Optuna HPT ---
-  n_trials: 20 # Jumlah total trial untuk dijalankan
+  n_trials: 50 # Jumlah total trial untuk dijalankan
   search_space:
     lr:
       low: 1.0e-5
@@ -46,7 +46,7 @@ sac_hyperparameters:
     dropout_rate:
       low: 0.1
       high: 0.4
-    batch_size: [64, 128]
+    batch_size: [128, 256]
     tau: # Parameter soft update
       low: 0.001
       high: 0.02
