@@ -43,6 +43,10 @@ source "$VENV_DIR/bin/activate"
 echo "--- Checking Python path after activation ---"
 which $PYTHON_CMD || echo "WARNING: $PYTHON_CMD not found in PATH after activation."
 
+# --- Set PYTHONPATH to ensure project modules are found ---
+export PYTHONPATH=$PROJECT_DIR
+echo "--> PYTHONPATH set to: $PYTHONPATH"
+
 # --- Run Hyperparameter Tuning ---
 echo "--> STAGE 1: Running Hyperparameter Search..."
 # The python script is expected to print its own PROGRESS updates
