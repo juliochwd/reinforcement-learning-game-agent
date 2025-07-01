@@ -6,8 +6,7 @@ import os
 import time
 import json
 import hashlib
-
-# --- Path Setup ---
+import argparse
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -53,16 +52,24 @@ def objective(trial, config, search_space, preprocessed_data):
     
     return validation_reward
 
-def main():
+def main(n_jobs_override=None):
     """
     Main function to run the hyperparameter search using Optuna.
-    Now loads data once, supports Pruning, and is ready for Parallel execution.
+    Accepts an override for n_jobs for programmatic execution.
     """
     logging.info("--- Starting Hyperparameter Search with Optuna (with Pruning & Parallel Support) ---")
     config = load_config()
     hpt_config = config.get('sac_hyperparameters', {})
     search_space = hpt_config.get('search_space', {})
     n_trials = hpt_config.get('n_trials', 50)
+    
+    # Determine n_jobs: override > config > default
+    if n_jobs_override is not None:
+        n_jobs = n_jobs_override
+    else:
+        n_jobs = hpt_config.get('n_jobs', 1)
+    
+    logging.info(f"Executing with n_jobs = {n_jobs}")
 
     # --- Pre-load and process data ONCE ---
     logging.info("Preprocessing data once before starting trials...")
@@ -104,7 +111,7 @@ def main():
     objective_with_args = lambda trial: objective(trial, config, search_space, preprocessed_data)
 
     # Start the optimization
-    study.optimize(objective_with_args, n_trials=n_trials, n_jobs=1) # n_jobs=1, parallelism is handled by running multiple scripts
+    study.optimize(objective_with_args, n_trials=n_trials, n_jobs=n_jobs)
 
     # --- Log the results ---
     total_duration = time.time() - start_time
@@ -136,4 +143,14 @@ def main():
 if __name__ == "__main__":
     # Setup basic logging for direct script execution
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    main()
+    
+    parser = argparse.ArgumentParser(description="Run Optuna Hyperparameter Search for SAC.")
+    parser.add_argument(
+        '--n_jobs', 
+        type=int, 
+        default=None, 
+        help='Number of parallel jobs for Optuna. Overrides config file setting.'
+    )
+    args = parser.parse_args()
+    
+    main(n_jobs_override=args.n_jobs)
