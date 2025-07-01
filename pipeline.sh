@@ -62,14 +62,14 @@ which $PYTHON_CMD || echo "WARNING: $PYTHON_CMD not found in PATH after activati
 
 # --- Run Hyperparameter Tuning ---
 echo "--> STAGE 1: Running Hyperparameter Search..."
-# Run as a module to ensure correct package resolution
-$PYTHON_CMD -m src.rl_agent.hyperparameter_search
+# Run the console script entry point created by setup.py
+run-hpt
 echo "PROGRESS: 80%"
 
 # --- Run Final Model Training ---
 echo "--> STAGE 2: Running Final Model Training..."
-# Run as a module to ensure correct package resolution
-$PYTHON_CMD -m train_final_model
+# Run the console script entry point created by setup.py
+train-final
 echo "PROGRESS: 100%"
 
 # --- Deactivate ---

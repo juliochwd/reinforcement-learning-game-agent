@@ -3,11 +3,6 @@ import json
 import os
 import sys
 
-# --- Path Setup ---
-project_root = os.path.dirname(os.path.abspath(__file__))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from src.rl_agent.train import train
 from src.utils.model_helpers import load_config
 
