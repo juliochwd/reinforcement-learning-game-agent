@@ -9,7 +9,7 @@ import os
 import yaml
 import logging
 import torch
-from rl_agent.model import GRU_DQN
+from rl_agent.model import ActorCriticSAC_GRU
 from rl_agent.environment import TradingEnv
 
 def load_config():
@@ -24,7 +24,7 @@ def load_config():
         if not os.path.exists(config_path):
             raise FileNotFoundError("config.yaml tidak ditemukan di root proyek.")
             
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 def load_model_robust(model_path, device):
@@ -46,7 +46,7 @@ def load_model_robust(model_path, device):
         checkpoint = torch.load(model_path, map_location=device, weights_only=False)
         architecture_params = checkpoint['architecture_params']
         
-        model = GRU_DQN(**architecture_params)
+        model = ActorCriticSAC_GRU(**architecture_params)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
         model.eval()
@@ -78,9 +78,7 @@ def create_environment(features_df, targets_df, config):
     env_params = {
         'window_size': config['window_size'],
         'bet_percentages': config['bet_percentages'],
-        'loss_penalty_multiplier': config['loss_penalty_multiplier'],
-        'win_bonus': config['win_bonus'],
-        'time_decay_penalty': config['time_decay_penalty'],
+        'payout_ratio': config['payout_ratio'],
         'transaction_cost': config['transaction_cost']
     }
     return TradingEnv(features_df=features_df, targets_df=targets_df, **env_params)

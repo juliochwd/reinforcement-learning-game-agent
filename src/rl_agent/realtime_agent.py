@@ -17,32 +17,27 @@ class RealtimeAgent:
     Orkestrator utama untuk operasi real-time. Mengelola loop game,
     interaksi UI, pengambilan keputusan, dan komunikasi dengan GUI.
     """
-    def __init__(self, config, gui_queue):
+    def __init__(self, config, gui_queue, phone=None, password=None):
         self.config = config
         self.gui_queue = gui_queue
+        self.phone = phone
+        self.password = password
         self.running = False
         self.is_paused = False
         self.command_queue = queue.Queue()
-
-        # Konfigurasi
         self.web_agent_config = self.config.get('web_agent', {})
         self.timeouts = self.web_agent_config.get('timeouts', {})
         self.timers = self.web_agent_config.get('timers', {})
         self.xpaths = self.web_agent_config.get('xpaths', {})
-
-        # Modul-modul yang direfaktor
         self.browser_manager = BrowserManager(config)
-        self.data_scraper = None  # Diinisialisasi setelah driver dibuat
+        self.data_scraper = None
         self.decision_maker = DecisionMaker(config)
-
-        # State Agen
         self.historical_data = None
         self.current_balance = self.web_agent_config.get('initial_balance', 2000000)
         self.initial_balance = None
         self.total_profit = 0
 
     def _get_selector(self, category, name):
-        """Helper untuk mendapatkan By dan Value selector dari config."""
         try:
             selector_config = self.xpaths[category][name]
             by_str = selector_config.get('by', 'XPATH').upper()
@@ -54,7 +49,6 @@ class RealtimeAgent:
             return None, None
 
     def _initialize_modules(self):
-        """Menginisialisasi semua modul yang diperlukan untuk agen."""
         logging.info("Menginisialisasi modul-modul agen...")
         driver = self.browser_manager.initialize_driver()
         if not driver:
@@ -102,7 +96,6 @@ class RealtimeAgent:
             return False
 
     def _place_bet(self, action_str, bet_amount_units):
-        """Menempatkan taruhan di situs web."""
         try:
             logging.info(f"Mencoba menempatkan taruhan: '{action_str}' dengan {bet_amount_units} unit.")
             if 'Small' in action_str:
@@ -130,23 +123,11 @@ class RealtimeAgent:
             logging.info("Taruhan berhasil ditempatkan dan dikonfirmasi.")
             time.sleep(self.timers.get('post_action_sleep', 1))
             return True
-        except (TimeoutException, NoSuchElementException) as e:
-            logging.error(f"Gagal menemukan elemen untuk menempatkan taruhan: {e}", exc_info=True)
-            # Coba tutup popup yang mungkin muncul setelah error
-            try:
-                close_by, close_val = self._get_selector('game_interface', 'popup_close_icon')
-                close_btn = self.browser_manager.get_driver().find_element(close_by, close_val)
-                close_btn.click()
-                logging.info("Berhasil menutup popup error.")
-            except (NoSuchElementException, TimeoutException):
-                logging.warning("Tidak ada popup error yang ditemukan untuk ditutup setelah kegagalan taruhan.")
-            return False
-        except WebDriverException as e:
-            logging.error(f"Gagal menempatkan taruhan karena error WebDriver: {e}", exc_info=True)
+        except Exception as e:
+            logging.error(f"Gagal menempatkan taruhan: {e}", exc_info=True)
             return False
 
     def _handle_new_round(self, predicting_period):
-        """Logika untuk menangani awal ronde baru."""
         logging.info(f"Membuat keputusan untuk ronde saat ini: {predicting_period}")
         
         if not self._is_data_sequential(predicting_period, window_size=self.config.get('window_size', 5)):
@@ -171,8 +152,8 @@ class RealtimeAgent:
                     logging.warning(f"Timer di {timer_str} di bawah ambang batas. Memaksa 'Hold'.")
                     action_str = f"Hold (Batas Waktu {timer_str})"
                     can_bet = False
-            except (ValueError, TypeError) as e:
-                logging.error(f"Tidak dapat parse timer '{timer_str}'. Melewatkan taruhan. Error: {e}")
+            except Exception as e:
+                logging.error(f"Tidak dapat parse timer. Melewatkan taruhan. Error: {e}")
                 action_str = "Hold (Timer Error)"
                 can_bet = False
 
@@ -185,7 +166,7 @@ class RealtimeAgent:
                     bet_amount_units = max(1, int(bet_amount_currency / bet_unit_divisor))
                     if self._place_bet(action_str, bet_amount_units):
                         bet_amount_display = bet_amount_units * bet_unit_divisor
-                except (ValueError, IndexError) as e:
+                except Exception as e:
                     logging.error(f"Tidak dapat parse persentase taruhan dari '{action_str}'. Default ke 1 unit. Error: {e}")
                     if self._place_bet(action_str, 1):
                          bet_amount_display = self.web_agent_config.get('bet_unit_divisor', 1000)
@@ -199,9 +180,8 @@ class RealtimeAgent:
         })
 
     def _update_after_round(self, last_bet_on_period):
-        """Memperbarui data setelah sebuah ronde selesai."""
         latest_result_df = None
-        for i in range(5): # Coba beberapa kali untuk mendapatkan hasil
+        for i in range(5):
             time.sleep(self.timers.get('api_retry_delay', 2))
             latest_result_df = self.data_scraper.scrape_latest_result()
             if latest_result_df is not None and int(latest_result_df['Period'].iloc[0]) >= last_bet_on_period:
@@ -223,23 +203,51 @@ class RealtimeAgent:
             logging.debug(f"Percobaan {i+1} untuk mengambil hasil untuk {last_bet_on_period}, belum tersedia.")
             time.sleep(1)
 
+    def run_standalone_scrape(self):
+        logging.info("--- Memulai Tugas Scraping Data Mandiri ---")
+        driver = None
+        try:
+            driver = self.browser_manager.initialize_driver()
+            if not driver:
+                logging.error("Gagal menginisialisasi WebDriver untuk scraping.")
+                return
+
+            self.data_scraper = DataScraper(driver, self.config)
+            
+            # Teruskan kredensial ke metode login
+            if not self.browser_manager.login(phone=self.phone, password=self.password) or not self.browser_manager.navigate_to_game():
+                logging.error("Gagal login atau navigasi untuk scraping.")
+                return
+
+            self.gui_queue.put({"type": "bulk_scrape_started"})
+            self.data_scraper.execute_bulk_scrape()
+            logging.info("Scraping data mandiri selesai.")
+
+        except Exception as e:
+            logging.critical(f"Error selama scraping mandiri: {e}", exc_info=True)
+        finally:
+            if driver:
+                self.browser_manager.close()
+            self.gui_queue.put({"type": "bulk_scrape_finished"})
+            logging.info("--- Tugas Scraping Data Mandiri Selesai ---")
+
     def _check_commands(self):
-        """Memeriksa dan mengeksekusi perintah dari antrian perintah."""
         try:
             command = self.command_queue.get_nowait()
             if command == "scrape_bulk":
+                logging.info("Perintah 'scrape_bulk' diterima oleh agen yang sedang berjalan.")
                 self.is_paused = True
                 self.gui_queue.put({"type": "bulk_scrape_started"})
                 new_data = self.data_scraper.execute_bulk_scrape()
                 if new_data is not None:
                     self.historical_data = new_data
+                    logging.info("Data historis agen diperbarui setelah scraping.")
                 self.is_paused = False
                 self.gui_queue.put({"type": "bulk_scrape_finished"})
         except queue.Empty:
             pass
 
     def _recover_session(self):
-        """Protokol pemulihan sesi jika halaman macet."""
         logging.warning("Halaman tampaknya macet. Memicu protokol pemulihan.")
         logging.info("Pemulihan L1: Me-refresh halaman dan menavigasi ke game.")
         self.browser_manager.get_driver().refresh()
@@ -258,10 +266,6 @@ class RealtimeAgent:
         return False
 
     def run(self):
-        """
-        Loop utama agen. Menginisialisasi modul, lalu terus-menerus memeriksa
-        ronde baru, membuat keputusan, dan memperbarui data.
-        """
         self.running = True
         logging.info("--- Memulai Agen Real-time Live ---")
         
@@ -283,7 +287,8 @@ class RealtimeAgent:
                 if time.time() - last_round_time > self.timeouts.get('recovery_threshold_seconds', 75):
                     if self._recover_session():
                         last_round_time = time.time()
-                    continue
+                    else:
+                        continue
 
                 predicting_period_str = self.data_scraper.get_predicting_period()
                 try:
@@ -307,10 +312,10 @@ class RealtimeAgent:
             except WebDriverException as e:
                 logging.error(f"Loop agen real-time gagal karena error WebDriver: {e}", exc_info=True)
                 if not self._recover_session():
-                    break # Hentikan loop jika pemulihan gagal
+                    break
             except Exception as e:
                 logging.critical(f"Loop agen real-time menghadapi error tak terduga: {e}", exc_info=True)
-                time.sleep(5) # Tunggu sebentar sebelum mencoba lagi
+                time.sleep(5)
 
         self.stop()
 

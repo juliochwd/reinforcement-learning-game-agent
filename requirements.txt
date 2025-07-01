@@ -27,5 +27,5 @@ statsmodels
 torch
 urllib3_secure_extra
 zstandard
-
-google-cloud-storage
+customtkinter
+Pillow

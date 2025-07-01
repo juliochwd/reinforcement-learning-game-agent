@@ -25,7 +25,7 @@ def load_config():
     """Memuat file konfigurasi utama (config.yaml)."""
     config_path = os.path.join(project_root, 'config.yaml')
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding="utf-8") as f:
             config = yaml.safe_load(f)
         return config
     except FileNotFoundError:

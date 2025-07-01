@@ -5,62 +5,56 @@ import yaml
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import tempfile
+import joblib
 
 # --- Path setup for utils ---
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils import prepare_data_splits, gcs_utils
+from utils import prepare_data_splits
 from src.utils.model_helpers import load_config, load_model_robust, create_environment
 
 def main():
     """
     Main function to evaluate the best trained model on the unseen test set.
-    This function is now cloud-aware.
     """
     logging.info("--- Starting Final Evaluation on Test Set ---")
     config = load_config()
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # --- GCS Path Handling ---
-        original_data_path = config['data_path']
-        original_model_dir = config['model_dir']
-        original_log_dir = config['log_dir']
+    # --- Path Handling for Local Execution ---
+    local_data_path = config['data_path']
+    local_model_dir = config['model_dir']
+    local_log_dir = config['log_dir']
+    os.makedirs(local_model_dir, exist_ok=True)
+    os.makedirs(local_log_dir, exist_ok=True)
 
-        local_data_path = temp_dir if gcs_utils.is_gcs_path(original_data_path) else original_data_path
-        local_model_dir = os.path.join(temp_dir, 'models') if gcs_utils.is_gcs_path(original_model_dir) else original_model_dir
-        local_log_dir = os.path.join(temp_dir, 'logs') if gcs_utils.is_gcs_path(original_log_dir) else original_log_dir
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    model_path = os.path.join(local_model_dir, "sac_model.pth") # Use the new model name
+    
+    policy_net = load_model_robust(model_path, device)
+    if policy_net is None:
+        logging.error(f"Failed to load model from {model_path}. Aborting evaluation.")
+        return
 
-        os.makedirs(local_model_dir, exist_ok=True)
-        os.makedirs(local_log_dir, exist_ok=True)
-
-        if gcs_utils.is_gcs_path(original_data_path):
-            logging.info(f"Downloading data from {original_data_path} to {local_data_path}...")
-            gcs_utils.download_from_gcs(original_data_path, local_data_path)
-        
-        if gcs_utils.is_gcs_path(original_model_dir):
-            logging.info(f"Downloading model from {original_model_dir} to {local_model_dir}...")
-            gcs_utils.download_from_gcs(original_model_dir, local_model_dir)
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        model_path = os.path.join(local_model_dir, config['best_model_name'])
-        
-        policy_net = load_model_robust(model_path, device)
-        if policy_net is None:
+    try:
+        # 1. Get unscaled data splits
+        _, _, _, _, test_X_unscaled, test_y = prepare_data_splits(local_data_path)
+        if test_X_unscaled.empty:
+            logging.error("Test data is empty. Aborting evaluation.")
             return
+        
+        # 2. Load the scaler that was saved during training
+        scaler_path = os.path.join(local_model_dir, config['scaler_name'])
+        scaler = joblib.load(scaler_path)
+        
+        # 3. Transform the test data using the loaded scaler
+        test_X = pd.DataFrame(scaler.transform(test_X_unscaled), columns=test_X_unscaled.columns, index=test_X_unscaled.index)
 
-        try:
-            data_file = os.path.join(local_data_path, os.path.basename(original_data_path))
-            _, _, _, _, test_X, test_y = prepare_data_splits(data_file)
-            if test_X.empty:
-                logging.error("Data uji kosong. Membatalkan evaluasi.")
-                return
-        except FileNotFoundError:
-            logging.error(f"Data file not found at '{data_file}'. Please run the scraper.")
-            return
+    except FileNotFoundError as e:
+        logging.error(f"Data or scaler file not found. Please run training first. Error: {e}")
+        return
 
-        test_env = create_environment(test_X, test_y, config)
+    test_env = create_environment(test_X, test_y, config)
     bet_percentages = config['bet_percentages']
     
     actions_taken = []
@@ -74,9 +68,8 @@ def main():
     log_interval = max(1, total_steps // 20)
 
     while not done:
-        state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
-            action = policy_net(state_tensor).max(1)[1].item()
+            action = policy_net.get_action(state, device)
         
         actions_taken.append(action)
         observation, reward, terminated, truncated, _ = test_env.step(action)
@@ -132,12 +125,8 @@ def main():
         plt.tight_layout()
         plot_path = os.path.join(local_log_dir, 'test_evaluation_summary.png')
         plt.savefig(plot_path)
-        logging.info(f"Test evaluation summary plot saved locally to {plot_path}")
+        logging.info(f"Test evaluation summary plot saved to {plot_path}")
         plt.close()
-
-        if gcs_utils.is_gcs_path(original_log_dir):
-            logging.info(f"Uploading logs from {local_log_dir} to {original_log_dir}...")
-            gcs_utils.upload_to_gcs(local_log_dir, original_log_dir)
     else:
         logging.info("Skipping plot generation as no actions were taken.")
 

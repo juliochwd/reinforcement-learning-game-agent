@@ -13,26 +13,20 @@ class TradingEnv(gym.Env):
 
     def __init__(self, features_df, targets_df, window_size=10,
                  initial_balance=2000000, bet_percentages=[0.01, 0.025],
-                 loss_penalty_multiplier=1.5, win_bonus=1e-5,
-                 time_decay_penalty=1e-6, transaction_cost=1e-4):
+                 payout_ratio=0.95, transaction_cost=1e-4):
         """
         Inisialisasi environment.
         
         Args:
-            loss_penalty_multiplier (float): Pengali untuk kerugian. Nilai > 1.0 membuat agen lebih menghindari risiko.
-                                             Diturunkan dari 2.0 menjadi 1.5 untuk mengurangi keengganan risiko yang ekstrem.
-            win_bonus (float): Bonus reward kecil yang diberikan untuk setiap tebakan yang benar, mendorong partisipasi.
-            time_decay_penalty (float): Penalti kecil yang diterapkan untuk setiap langkah 'Hold', mendorong agen untuk aktif.
-                                        Menggantikan 'hold_reward' positif sebelumnya.
+            payout_ratio (float): Imbal hasil kotor untuk taruhan yang menang.
+            transaction_cost (float): Biaya per transaksi sebagai persentase dari jumlah taruhan.
         """
         super(TradingEnv, self).__init__()
 
         self.window_size = window_size
         self.initial_balance = initial_balance
         self.bet_percentages = bet_percentages
-        self.loss_penalty_multiplier = loss_penalty_multiplier
-        self.win_bonus = win_bonus
-        self.time_decay_penalty = time_decay_penalty
+        self.payout_ratio = payout_ratio
         self.transaction_cost = transaction_cost
         
         # Pastikan kedua dataframe memiliki indeks yang selaras
@@ -92,8 +86,7 @@ class TradingEnv(gym.Env):
         reward = 0
 
         if action == 0:  # Aksi 'Tahan'
-            # Terapkan penalti kecil untuk mendorong aksi (menghindari stagnasi)
-            reward = -self.time_decay_penalty
+            reward = 0 # Tidak ada reward atau penalti untuk menahan
         else:  # Aksi taruhan
             num_bet_levels = len(self.bet_percentages)
             
@@ -109,22 +102,20 @@ class TradingEnv(gym.Env):
             bet_amount = min(bet_amount, self.balance)
 
             if self.balance > 0 and bet_amount > 0:
-                # Terapkan biaya transaksi untuk setiap taruhan
-                self.balance -= bet_amount * self.transaction_cost
-
+                # Terapkan biaya transaksi
+                transaction_fee = bet_amount * self.transaction_cost
+                
                 if bet_choice == actual_outcome:
-                    # Kemenangan: imbalan adalah persentase dari keuntungan + bonus kemenangan
-                    profit = bet_amount * 0.95
+                    # Kemenangan: reward adalah profit bersih
+                    profit = bet_amount * self.payout_ratio
                     self.balance += profit
-                    # Imbalan dinormalisasi + bonus kecil untuk mendorong kemenangan
-                    reward = (profit / self.initial_balance) + self.win_bonus
+                    reward = profit - transaction_fee # Reward adalah profit aktual
                 else:
-                    # Kekalahan: penalti adalah persentase dari kerugian, dikalikan dengan pengganda penalti
+                    # Kekalahan: reward adalah kerugian bersih
                     self.balance -= bet_amount
-                    # Penalti yang lebih besar untuk kerugian untuk mendorong kehati-hatian
-                    reward = - (bet_amount / self.initial_balance) * self.loss_penalty_multiplier
+                    reward = -bet_amount - transaction_fee # Reward adalah kerugian aktual
         
-        self.total_reward = self.balance - self.initial_balance  # Lacak total profit secara terpisah
+        self.total_reward = self.balance - self.initial_balance
         self.current_step += 1
 
         done = (self.current_step >= len(self.features_df) -1) or (self.balance <= 0)

@@ -2,6 +2,7 @@ import logging
 import time
 import pandas as pd
 import numpy as np
+import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -114,79 +115,168 @@ class DataScraper:
             logging.error(f"Terjadi kesalahan WebDriver saat scrape timer: {e}")
             return "00:00"
 
+    def _handle_post_login_popups(self):
+        """Secara berulang mencari dan menutup semua pop-up 'Confirm' setelah login."""
+        logging.info("Checking for post-login pop-ups...")
+        max_popups_to_close = 10
+        popups_closed = 0
+        while popups_closed < max_popups_to_close:
+            try:
+                confirm_button_xpath = "//div[@class='promptBtn' and text()='Confirm']"
+                confirm_button = WebDriverWait(self.driver, 3).until(
+                    EC.element_to_be_clickable((By.XPATH, confirm_button_xpath))
+                )
+                logging.info(f"Found a 'Confirm' pop-up. Closing it (popup #{popups_closed + 1})...")
+                self.driver.execute_script("arguments[0].click();", confirm_button)
+                popups_closed += 1
+                time.sleep(1)
+            except TimeoutException:
+                logging.info("No more 'Confirm' pop-ups found.")
+                break
+            except Exception as e:
+                logging.error(f"An error occurred while handling pop-ups: {e}")
+                break
+
+    def _get_total_pages_from_ui(self, default_pages=1):
+        """Membaca jumlah total halaman dari elemen UI."""
+        try:
+            page_info_element = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'GameRecord__C-foot-page'))
+            )
+            page_text = page_info_element.text
+            total_pages = int(page_text.split('/')[1])
+            logging.info(f"Successfully parsed total pages from UI: {total_pages}")
+            return total_pages
+        except Exception as e:
+            logging.error(f"Could not parse total pages from UI. Error: {e}. Defaulting to {default_pages} page(s).")
+            return default_pages
+
     def execute_bulk_scrape(self):
         """
-        Menavigasi ke halaman riwayat permainan dan melakukan scrape beberapa halaman
-        data untuk membangun atau memperbarui dataset historis lokal.
+        Menjalankan proses scraping data riwayat permainan secara lengkap dengan
+        menggunakan logika yang telah terbukti andal.
         """
-        logging.info("--- Memulai Scrape Data Massal menggunakan sesi yang ada ---")
+        logging.info("--- Memulai Tugas Scraping Data Massal (Versi API) ---")
         try:
-            my_acc_by, my_acc_val = self._get_selector('navigation', 'my_account_button')
-            my_account_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((my_acc_by, my_acc_val)))
-            my_account_button.click()
-            
-            hist_by, hist_val = self._get_selector('navigation', 'game_history_button')
-            game_history_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((hist_by, hist_val)))
-            game_history_button.click()
-            time.sleep(self.timers.get('api_retry_delay', 2))
+            # TAHAP 1: NAVIGASI DAN LOGIN (jika diperlukan)
+            # Asumsi driver sudah terbuka, tapi kita pastikan di halaman login.
+            if "login" not in self.driver.current_url:
+                 self.driver.get(self.web_agent_config.get('login_url', 'https://55v7nlu.com/#/login'))
 
-            max_pages = self.web_agent_config.get('scraping', {}).get('max_pages', 300)
+            # Cek apakah sudah login, jika belum, lakukan login
+            try:
+                WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.NAME, 'userNumber')))
+                logging.info("Halaman login terdeteksi. Memulai proses login...")
+                phone = os.getenv('PHONE_NUMBER')
+                password = os.getenv('PASSWORD')
+                if not (phone and password):
+                    logging.critical("Variabel lingkungan PHONE_NUMBER atau PASSWORD tidak diatur. Proses login dibatalkan.")
+                    return None
+                
+                self.driver.find_element(By.NAME, 'userNumber').send_keys(phone)
+                self.driver.find_element(By.XPATH, '//input[@placeholder="Password"]').send_keys(password)
+                self.driver.find_element(By.XPATH, '//button[text()="Log in"]').click()
+                logging.info("Login submitted.")
+            except TimeoutException:
+                logging.info("Sudah dalam keadaan login atau halaman login tidak terdeteksi. Melanjutkan proses.")
+
+            self._handle_post_login_popups()
+
+            logging.info("Zooming out page to 80% to ensure all elements are visible...")
+            self.driver.execute_script("document.body.style.zoom='80%'")
+
+            # TAHAP 2: NAVIGASI KE PERMAINAN 'WIN GO 1MIN'
+            logging.info("Navigating to the 'Win Go 1Min' game...")
+            try:
+                win_go_xpath = "//div[@class='lottery' and .//span[normalize-space()='Win Go']]"
+                win_go_menu = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, win_go_xpath)))
+                self.driver.execute_script("arguments[0].click();", win_go_menu)
+                
+                win_go_1min_xpath = "//div[contains(@class, 'GameList__C-item') and contains(., '1Min') and not(contains(., '30s'))]"
+                win_go_1min_button = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, win_go_1min_xpath)))
+                self.driver.execute_script("arguments[0].click();", win_go_1min_button)
+                logging.info("Successfully navigated to 'Win Go 1Min'.")
+            except TimeoutException as e:
+                logging.critical(f"Failed to navigate to 'Win Go 1Min' game. Error: {e}")
+                self.driver.save_screenshot("debug_screenshot_navigation_failed.png")
+                return None
+
+            # TAHAP 3: SCRAPING DATA
+            total_pages = self._get_total_pages_from_ui()
+            max_pages_to_scrape = self.web_agent_config.get('scraping', {}).get('max_pages', 300)
             all_records = []
 
-            for page_num in range(1, max_pages + 1):
-                logging.info(f"Scraping halaman {page_num}/{max_pages}...")
+            logging.info("Processing data for the initial page (Page 1)...")
+            try:
+                initial_request = next(req for req in reversed(self.driver.requests) if self.api_endpoint in req.url)
+                records_on_page = process_api_response(initial_request)
+                if records_on_page:
+                    all_records.extend(records_on_page)
+            except StopIteration:
+                logging.critical("Could not find the initial API request for page 1. Aborting.")
+                return None
+
+            for page_num in range(2, min(total_pages, max_pages_to_scrape) + 1):
+                logging.info(f"Navigating to page {page_num}/{min(total_pages, max_pages_to_scrape)}...")
                 del self.driver.requests
-                
-                if page_num > 1:
-                    try:
-                        next_by, next_val = self._get_selector('navigation', 'history_next_page_button')
-                        next_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((next_by, next_val)))
-                        self.driver.execute_script("arguments[0].click();", next_button)
-                    except TimeoutException:
-                        logging.info("Tidak ada tombol halaman 'berikutnya' yang ditemukan. Mengakhiri scrape massal.")
-                        break
-                
                 try:
-                    request = self.driver.wait_for_request(self.api_endpoint, timeout=self.timeouts.get('api_wait', 30))
+                    next_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'GameRecord__C-foot-next')]"))
+                    )
+                    self.driver.execute_script("arguments[0].click();", next_button)
+                except TimeoutException:
+                    logging.warning("Could not find or click the 'next' button. Stopping pagination.")
+                    break
+
+                try:
+                    request = self.driver.wait_for_request(self.api_endpoint, timeout=30)
                     records_on_page = process_api_response(request)
                     if records_on_page:
                         all_records.extend(records_on_page)
                     else:
-                        logging.warning(f"Tidak ada catatan yang ditemukan di halaman {page_num}. Mengakhiri scrape massal.")
-                        break
+                        logging.warning(f"No records processed from API response for page {page_num}.")
                 except TimeoutException:
-                    logging.error(f"Permintaan API timed out di halaman {page_num}. Mengakhiri scrape massal.")
+                    logging.error(f"Timed out waiting for API request on page {page_num}. Stopping.")
                     break
             
-            logging.info(f"Scrape massal selesai. Total catatan yang ditemukan: {len(all_records)}")
-            if all_records:
-                df = pd.DataFrame(all_records)
-                df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
-                df['Number'] = pd.to_numeric(df['Number'])
-                df['Big/Small'] = np.where(df['Number'] >= 5, 'Big', 'Small')
-                final_df = df[['Period', 'Number', 'Big/Small', 'Color', 'Premium']].copy()
-                final_df = final_df.sort_values(by='Period', ascending=True).drop_duplicates(subset='Period', keep='last')
-                
-                output_csv_path = self.config['data_path']
-                try:
-                    existing_df = pd.read_csv(output_csv_path)
-                    combined_df = pd.concat([existing_df, final_df], ignore_index=True)
-                except FileNotFoundError:
-                    combined_df = final_df
-                
-                combined_df.drop_duplicates(subset='Period', keep='last', inplace=True)
-                combined_df.sort_values(by='Period', ascending=True, inplace=True)
-                combined_df.to_csv(output_csv_path, index=False)
-                logging.info(f"BERHASIL: Semua {len(combined_df)} catatan unik disimpan ke '{output_csv_path}'")
-                return combined_df
-            return None
-        except (TimeoutException, NoSuchElementException) as e:
-            logging.error(f"Elemen navigasi untuk scrape massal tidak ditemukan: {e}", exc_info=True)
-            return None
-        except WebDriverException as e:
-            logging.error(f"Terjadi kesalahan WebDriver saat scrape massal: {e}", exc_info=True)
+            # TAHAP 4: PROSES DAN SIMPAN DATA
+            logging.info(f"Total records scraped via API: {len(all_records)}. Processing...")
+            if not all_records:
+                logging.warning("No records were scraped. Exiting.")
+                return None
+
+            df = pd.DataFrame(all_records)
+            df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
+            df['Number'] = pd.to_numeric(df['Number'])
+            df['Big/Small'] = np.where(df['Number'] >= 5, 'Big', 'Small')
+            final_df = df[['Period', 'Number', 'Big/Small', 'Color', 'Premium']].copy()
+            final_df['Period'] = final_df['Period'].astype(str)
+            final_df = final_df.sort_values(by='Period', ascending=True).drop_duplicates(subset='Period', keep='last')
+
+            output_csv_path = self.config['data_path']
+            try:
+                existing_df = pd.read_csv(output_csv_path)
+                existing_df['Period'] = existing_df['Period'].astype(str)
+                combined_df = pd.concat([existing_df, final_df], ignore_index=True)
+            except FileNotFoundError:
+                logging.info(f"'{output_csv_path}' not found. A new file will be created.")
+                combined_df = final_df
+            
+            combined_df.drop_duplicates(subset='Period', keep='last', inplace=True)
+            combined_df.sort_values(by='Period', ascending=True, inplace=True)
+            combined_df.to_csv(output_csv_path, index=False)
+            logging.info(f"SUCCESS: All {len(combined_df)} unique records have been saved to '{output_csv_path}'")
+            return combined_df
+
+        except Exception as e:
+            logging.critical(f"An unrecoverable error occurred during the scraping process: {e}", exc_info=True)
             return None
         finally:
-            logging.info("--- Scrape Data Massal Selesai ---")
-            self.driver.back()
-            self.driver.back()
+            logging.info("--- Tugas Scraping Data Massal Selesai ---")
+            # Navigasi kembali ke halaman game utama untuk melanjutkan operasi normal
+            try:
+                game_page_url = self.web_agent_config.get('game_url') # Asumsi URL game ada di config
+                if game_page_url and self.driver.current_url != game_page_url:
+                    self.driver.get(game_page_url)
+            except Exception as nav_e:
+                logging.warning(f"Could not navigate back to the main game page: {nav_e}")

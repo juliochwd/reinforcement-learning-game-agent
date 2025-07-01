@@ -4,7 +4,8 @@ import numpy as np
 from collections import namedtuple
 
 # Define the Transition tuple, which will be used by the memory buffer
-Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
+# Added 'done' to the tuple to support SAC and other modern algorithms
+Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
 
 class SumTree:
     """
@@ -89,10 +90,11 @@ class PrioritizedReplayMemory:
         """Calculate priority from TD-error."""
         return (np.abs(error) + self.e) ** self.a
 
-    def push(self, error, *args):
+    def push(self, error, state, action, reward, next_state, done):
         """Store a new transition in the memory with its initial priority."""
         p = self._get_priority(error)
-        self.tree.add(p, Transition(*args))
+        transition = Transition(state, action, reward, next_state, done)
+        self.tree.add(p, transition)
 
     def sample(self, batch_size):
         """

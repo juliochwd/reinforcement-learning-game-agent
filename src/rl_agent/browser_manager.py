@@ -40,14 +40,15 @@ class BrowserManager:
         self.driver.set_page_load_timeout(self.timeouts.get('page_load', 60))
         return self.driver
 
-    def login(self):
+    def login(self, phone=None, password=None):
         """Menangani proses login ke situs web."""
         try:
-            phone = os.getenv('PHONE_NUMBER')
-            password = os.getenv('PASSWORD')
+            # Prioritaskan kredensial yang diberikan, fallback ke variabel lingkungan
+            login_phone = phone if phone else os.getenv('PHONE_NUMBER')
+            login_password = password if password else os.getenv('PASSWORD')
 
-            if not phone or not password:
-                logging.critical("PHONE_NUMBER atau PASSWORD environment variables tidak diatur. Proses login dibatalkan.")
+            if not login_phone or not login_password:
+                logging.critical("Kredensial (PHONE_NUMBER/PASSWORD) tidak tersedia. Proses login dibatalkan.")
                 return False
 
             logging.info(f"Navigasi ke halaman login: {self.login_url}")
@@ -58,8 +59,8 @@ class BrowserManager:
             submit_by, submit_val = self._get_selector('login', 'submit_button')
 
             WebDriverWait(self.driver, self.timeouts.get('element_wait', 30)).until(EC.presence_of_element_located((user_by, user_val)))
-            self.driver.find_element(user_by, user_val).send_keys(phone)
-            self.driver.find_element(pass_by, pass_val).send_keys(password)
+            self.driver.find_element(user_by, user_val).send_keys(login_phone)
+            self.driver.find_element(pass_by, pass_val).send_keys(login_password)
             self.driver.find_element(submit_by, submit_val).click()
             
             logging.info("Login terkirim. Menunggu navigasi...")

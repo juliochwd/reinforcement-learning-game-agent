@@ -3,9 +3,18 @@ Rekomendasi Kunci: Untuk mengatasi risiko tersebut dan memperkuat solusi Anda, r
 
 
 set PHONE_NUMBER=82284608240& set PASSWORD=Dh4910va& python api_scraper.py
-
-
 cd reinforcement-learning-game-agent 
-
 bash run_training_job.sh
 nohup bash run_training_job.sh &
+cd reinforcement-learning-game-agent
+tail -f -n 100 nohup.out
+pkill -f run_training_job.sh
+
+setup_cloud_environment.ps1
+build_and_push_docker.ps1
+run_pipeline.ps1
+
+gcloud compute instances create hyp-train --project=gen-lang-client-0755857756 --zone=asia-southeast2-a --machine-type=n2d-standard-8 --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default --metadata=enable-osconfig=TRUE --no-restart-on-failure --maintenance-policy=TERMINATE --provisioning-model=SPOT --instance-termination-action=STOP --service-account=668790887609-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --tags=https-server,http-server --create-disk=auto-delete=yes,boot=yes,device-name=instance-20250630-142615,disk-resource-policy=projects/gen-lang-client-0755857756/regions/asia-southeast2/resourcePolicies/default-schedule-1,image=projects/ml-images/global/images/c0-deeplearning-common-cu124-v20250325-debian-11-py310-conda,mode=rw,size=200,type=pd-ssd --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --labels=goog-ops-agent-policy=v2-x86-template-1-4-0,goog-ec-src=vm_add-gcloud --reservation-affinity=none && printf 'agentsRule:\n  packageState: installed\n  version: latest\ninstanceFilter:\n  inclusionLabels:\n  - labels:\n      goog-ops-agent-policy: v2-x86-template-1-4-0\n' > config.yaml && gcloud compute instances ops-agents policies create goog-ops-agent-v2-x86-template-1-4-0-asia-southeast2-a --project=gen-lang-client-0755857756 --zone=asia-southeast2-a --file=config.yaml
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDN4RQhNR1zWsED28IT2D2IeeMm8DGFsTa5lTEFwImGMlxkZs2xI2Wsc77w60ozEi3JtgEf1Ze+POeZpKk+lA1n1MWi7unyc0dVtm/0NPqZxvJYBpE/Nk66OIlTFmEGDGKWMAYogMNx5xVu1cBb0m1i1NvL6whiMIKducslTxg7fqZrP0EICq6etwPn067PRYq0Q4tYZIJOsCYegTl0pHlgxHue/3PfHYLfi8ft8aufU11AFdEvzyWmAGsdaBy3sK+Aq/RpwnCa47BchKHxOHAU0rZP5fiULlHpaxQmzmcSQJr3HoYwQj+19BtXXNoC447yGA7ZHF0xfl6kXSBLaJe0lj27XtwHcZ73XpOhpybcH+D/Xr1vVxmaRgVH/mKU7qpomRVi7wZ49K8K/y1PjlGNnPMVg5Ywb1Smi7uo2lQLXy9ADmIc9wJK6mZ3YZlGuxXWrv+FGdyOfr5Y7+Rlrghfn6Tx7beb5jqSP9gEF5RIbK2KK2Sx35H4g/YYiP+Bu8S58bAfQABc/+z52PcsK8d6HIke27i9K42cloXXi7s5rKKFHgeBDzKrZbs6HVLl+B60pjRr3kfba8Qy4qTNUuT2M1GUYmqoeDrFM8He0MLNutLz/iTAfGEa83rScnSIDRji2mI5xHzvKbzb5tERJvAN0CxFhzWN8Af82IDm4Vfflw== juliowadudoko
+
+ssh juliowadudoko@34.101.233.3

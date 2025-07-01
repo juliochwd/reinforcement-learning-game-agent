@@ -26,7 +26,9 @@ class DecisionMaker:
     def load_model(self):
         """Memuat model RL dan scaler fitur."""
         logging.info("Memuat model Decision Maker dan scaler...")
-        model_path = os.path.join(self.config['model_dir'], self.config['best_model_name'])
+        # Use the model name from the config, making it flexible for testing
+        model_filename = self.config.get('best_model_name', 'sac_model.pth')
+        model_path = os.path.join(self.config['model_dir'], model_filename)
         self.policy_net = load_model_robust(model_path, self.device)
         if self.policy_net is None:
             logging.error("Gagal memuat model policy network. DecisionMaker tidak dapat berfungsi.")
@@ -55,15 +57,18 @@ class DecisionMaker:
             # 2. Scaling fitur
             scaled_features_np = self.scaler.transform(features_df)
             
-            # 3. Dapatkan state terbaru (baris terakhir)
-            state = scaled_features_np[-1]
+            # 3. Dapatkan state terbaru (window_size baris terakhir)
+            window_size = self.config.get('window_size', 10)
+            if len(scaled_features_np) < window_size:
+                logging.error(f"Not enough historical data to form a state window. Have {len(scaled_features_np)}, need {window_size}.")
+                return 0, "Hold (Data Error)"
             
-            # 4. Konversi ke tensor PyTorch
-            state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = scaled_features_np[-window_size:] # Get the last 'window_size' rows
             
-            # 5. Dapatkan aksi dari policy network
+            # 4. Dapatkan aksi dari policy network (tidak perlu konversi tensor di sini)
             with torch.no_grad():
-                action_idx = self.policy_net(state_tensor).max(1)[1].item()
+                # The get_action method now handles tensor conversion and batching
+                action_idx = self.policy_net.get_action(state, self.device)
             
             action_str = self.action_map.get(action_idx, "Unknown")
             logging.info(f"DecisionMaker memilih aksi: {action_str} (indeks: {action_idx})")

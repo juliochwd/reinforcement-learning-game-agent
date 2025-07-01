@@ -2,259 +2,306 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import random
-import math
-import pandas as pd
-from collections import namedtuple, deque
+import numpy as np
 import logging
-import yaml
 import os
-import argparse
-import tempfile
+import time
+import optuna
+import pandas as pd
+import joblib
+from sklearn.preprocessing import MinMaxScaler
 
-# --- Path setup for utils ---
+# --- Path setup ---
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import prepare_data_splits
-from utils import gcs_utils
+from utils.model_helpers import load_config, create_environment
+from utils.per import PrioritizedReplayMemory, Transition
 
-# --- Replay Memory (Now Prioritized) ---
-from src.utils.per import PrioritizedReplayMemory, Transition
-from src.utils.model_helpers import load_config, create_environment
-from rl_agent.model import GRU_DQN
-
-def optimize_model(policy_net, target_net, memory, optimizer, batch_size, gamma, device):
-    """
-    Performs one step of optimization on the policy network.
-    This function integrates Double DQN and Prioritized Experience Replay.
-    """
-    if len(memory) < batch_size:
-        return  # Not enough samples in memory to train
-
-    transitions, idxs, is_weights = memory.sample(batch_size)
-    batch = Transition(*zip(*transitions))
-    is_weights = torch.tensor(is_weights, dtype=torch.float32, device=device)
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
-
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
-    next_state_values = torch.zeros(batch_size, device=device)
-    with torch.no_grad():
-        best_actions = policy_net(non_final_next_states).max(1)[1].unsqueeze(1)
-        q_values_from_target = target_net(non_final_next_states)
-        next_state_values[non_final_mask] = q_values_from_target.gather(1, best_actions).squeeze(1)
-
-    expected_state_action_values = (next_state_values * gamma) + reward_batch
-    loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1), reduction='none')
-    
-    errors = torch.abs(state_action_values - expected_state_action_values.unsqueeze(1)).detach().cpu().numpy()
-    for i in range(batch_size):
-        memory.update(idxs[i], errors[i][0])
-
-    weighted_loss = (loss * is_weights.unsqueeze(1)).mean()
-    optimizer.zero_grad()
-    weighted_loss.backward()
-    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
-    optimizer.step()
+# --- SAC Specific Imports ---
+from rl_agent.model import ActorCriticSAC_GRU
 
 def train(
-    lr=1e-4,
+    lr=3e-4,
     gamma=0.99,
-    hidden_size=128,
+    hidden_size=256,
     dropout_rate=0.2,
-    batch_size=32,
-    eps_decay=2000,
-    num_episodes=100,
-    save_model=True
+    batch_size=256,
+    buffer_size=1_000_000,
+    tau=0.005,  # For soft target updates
+    alpha=0.2,  # Initial entropy coefficient
+    autotune_alpha=True,
+    total_timesteps=100_000,
+    learning_starts=5000,
+    eval_freq=10000,
+    early_stopping_patience=5,
+    early_stopping_threshold=0.01,
+    save_model=True,
+    optuna_trial=None,
+    preprocessed_data=None
 ):
     """
-    Trains the DQN model with given hyperparameters and returns the best validation reward.
-    This function is now cloud-aware and can handle GCS paths.
+    Trains the SAC-Discrete model.
+    Can accept preprocessed data to speed up HPT.
     """
     config = load_config()
-    logging.info("Starting training with Dueling, Double DQN, and Prioritized Experience Replay.")
+    logging.info("Starting SAC-Discrete training.")
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # --- GCS Path Handling ---
-        original_data_path = config['data_path']
-        original_model_dir = config['model_dir']
-        
-        local_data_path = temp_dir if gcs_utils.is_gcs_path(original_data_path) else original_data_path
-        local_model_dir = os.path.join(temp_dir, 'models') if gcs_utils.is_gcs_path(original_model_dir) else original_model_dir
-        
-        os.makedirs(local_model_dir, exist_ok=True)
+    # --- Path Handling: Define paths that are always needed ---
+    local_model_dir = config['model_dir']
+    os.makedirs(local_model_dir, exist_ok=True)
 
-        if gcs_utils.is_gcs_path(original_data_path):
-            logging.info(f"Downloading data from {original_data_path} to {local_data_path}...")
-            gcs_utils.download_from_gcs(original_data_path, local_data_path)
-        
-        # --- Training Logic (using local paths) ---
-        final_hyperparams = {
-            'lr': lr, 'gamma': gamma, 'hidden_size': hidden_size,
-            'dropout_rate': dropout_rate, 'batch_size': batch_size, 'eps_decay': eps_decay
-        }
-        logging.info("Using Hyperparameters: %s", final_hyperparams)
+    if preprocessed_data:
+        logging.info("Using preprocessed data.")
+        # When data is preprocessed, we still need to handle the scaler
+        train_X_unscaled, train_y, val_X_unscaled, val_y = preprocessed_data
+    else:
+        logging.info("Loading and preprocessing data...")
+        # Data will be loaded inside the try block
 
-        try:
-            # Use local paths for processing
-            # If the original path was GCS, the data was downloaded into local_data_path (a temp dir).
-            # We need to point to the actual file inside that directory.
-            if gcs_utils.is_gcs_path(original_data_path):
-                data_file = os.path.join(local_data_path, os.path.basename(original_data_path))
-            else:
-                data_file = local_data_path # It was a local path all along
-            scaler_path = os.path.join(local_model_dir, config['scaler_name'])
-            
-            train_X, train_y, val_X, val_y, _, _ = prepare_data_splits(
-                data_path=data_file,
-                scaler_path=scaler_path
+    # --- Data Loading and Processing ---
+    try:
+        if not preprocessed_data:
+            # 1. Get unscaled data splits if not provided
+            local_data_path = config['data_path']
+            train_X_unscaled, train_y, val_X_unscaled, val_y, _, _ = prepare_data_splits(
+                data_path=local_data_path
             )
-            if train_X.empty or val_X.empty:
-                logging.error("Failed to create data splits. Aborting training.")
-                return -float('inf')
-        except FileNotFoundError:
-            logging.error(f"Data file not found at '{data_file}'. Aborting.")
-            return -float('inf')
-
-        train_env = create_environment(train_X, train_y, config)
-        val_env = create_environment(val_X, val_y, config)
         
-        n_actions = train_env.action_space.n
-        features_per_step = train_env.features_per_step
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        policy_net = GRU_DQN(features_per_step, n_actions, config['window_size'], final_hyperparams['hidden_size'], final_hyperparams['dropout_rate']).to(device)
-        target_net = GRU_DQN(features_per_step, n_actions, config['window_size'], final_hyperparams['hidden_size'], final_hyperparams['dropout_rate']).to(device)
-        target_net.load_state_dict(policy_net.state_dict())
-        target_net.eval()
-
-        optimizer = optim.AdamW(policy_net.parameters(), lr=final_hyperparams['lr'])
-        memory = PrioritizedReplayMemory(config['memory_size'])
+        # 2. Handle the scaler lifecycle here
+        scaler = MinMaxScaler()
+        logging.info("Fitting scaler ONLY on training data...")
+        train_X_scaled_np = scaler.fit_transform(train_X_unscaled)
+        train_X = pd.DataFrame(train_X_scaled_np, columns=train_X_unscaled.columns, index=train_X_unscaled.index)
         
-        best_validation_reward = -float('inf')
-        epochs_no_improve = 0
-        best_model_state = None
-        TARGET_UPDATE = config.get('target_update_frequency', 10)
-        steps_done = 0
+        # 3. Save the fitted scaler
+        scaler_path = os.path.join(local_model_dir, config['scaler_name'])
+        joblib.dump(scaler, scaler_path)
+        logging.info(f"Fitted feature scaler saved to: {scaler_path}")
 
-        for i_episode in range(num_episodes):
-            logging.info(f"--- Starting Episode {i_episode + 1}/{num_episodes} ---")
-            policy_net.train()
-            state, _ = train_env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-            done = False
-            while not done:
-                sample = random.random()
-                eps_threshold = config['eps_end'] + (config['eps_start'] - config['eps_end']) * math.exp(-1. * steps_done / final_hyperparams['eps_decay'])
-                steps_done += 1
+        # 4. Transform validation data with the same scaler
+        logging.info("Applying scaler to validation data...")
+        val_X_scaled_np = scaler.transform(val_X_unscaled)
+        val_X = pd.DataFrame(val_X_scaled_np, columns=val_X_unscaled.columns, index=val_X_unscaled.index)
 
-                # Log progress every 500 steps to give feedback during long training runs
-                if train_env.current_step % 500 == 0:
-                    logging.info(f"  [Episode {i_episode + 1}] Step {train_env.current_step}/{len(train_env.features_df)}...")
-                
-                if sample > eps_threshold:
-                    with torch.no_grad():
-                        action = policy_net(state).max(1)[1].view(1, 1)
-                else:
-                    action = torch.tensor([[train_env.action_space.sample()]], device=device, dtype=torch.long)
-                
-                observation, reward, terminated, truncated, _ = train_env.step(action.item())
-                reward = torch.tensor([reward], device=device, dtype=torch.float32)
-                done = terminated or truncated
-                next_state = None if done else torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
-                
-                with torch.no_grad():
-                    current_q = policy_net(state).gather(1, action)
-                    next_q = target_net(next_state).max(1)[0].unsqueeze(1) if next_state is not None else torch.tensor([[0.0]], device=device)
-                    expected_q = reward + (final_hyperparams['gamma'] * next_q)
-                    error = abs(current_q - expected_q).item()
-                
-                memory.push(error, state, action, next_state, reward)
-                state = next_state
-                
-                optimize_model(policy_net, target_net, memory, optimizer, final_hyperparams['batch_size'], final_hyperparams['gamma'], device)
+    except FileNotFoundError:
+        logging.error(f"Data file not found at '{config['data_path']}'. Aborting.")
+        return -float('inf')
 
-            if (i_episode + 1) % TARGET_UPDATE == 0:
-                target_net.load_state_dict(policy_net.state_dict())
+    # --- Environment, Device, and Model Setup ---
+    env = create_environment(train_X, train_y, config)
+    val_env = create_environment(val_X, val_y, config)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    n_actions = env.action_space.n
+    features_per_step = env.features_per_step
+    window_size = config['window_size']
 
-            if (i_episode + 1) % config['eval_every'] == 0:
-                policy_net.eval()
-                val_state, _ = val_env.reset()
-                val_done = False
-                while not val_done:
-                    val_state_tensor = torch.tensor(val_state, dtype=torch.float32, device=device).unsqueeze(0)
-                    with torch.no_grad():
-                        val_action = policy_net(val_state_tensor).max(1)[1].item()
-                    val_state, _, val_terminated, val_truncated, _ = val_env.step(val_action)
-                    val_done = val_terminated or val_truncated
-                
-                current_val_reward = val_env.total_reward
-                logging.info(f"--- Validation at Episode {i_episode + 1} | Reward: {current_val_reward:.2f} | Best: {best_validation_reward:.2f} ---")
-                
-                if current_val_reward > best_validation_reward:
-                    best_validation_reward = current_val_reward
-                    epochs_no_improve = 0
-                    if save_model:
-                        best_model_state = policy_net.state_dict().copy()
-                        logging.info(f"*** New best model state captured with reward {best_validation_reward:.2f} ***")
-                else:
-                    epochs_no_improve += 1
-                
-                if epochs_no_improve >= config.get('early_stopping_patience', 5):
-                    logging.info(f"Early stopping triggered after {i_episode + 1} episodes.")
-                    break
+    agent = ActorCriticSAC_GRU(features_per_step, n_actions, window_size, hidden_size, dropout_rate).to(device)
+    critic_target = ActorCriticSAC_GRU(features_per_step, n_actions, window_size, hidden_size, dropout_rate).to(device)
+    critic_target.load_state_dict(agent.state_dict())
+    critic_target.eval()
 
-        if save_model and best_model_state:
-            local_model_path = os.path.join(local_model_dir, config['best_model_name'])
+    actor_optimizer = optim.Adam(agent.actor_head.parameters(), lr=lr)
+    critic_optimizer = optim.Adam(list(agent.critic1_head.parameters()) + list(agent.critic2_head.parameters()), lr=lr)
+
+    # --- Entropy Tuning ---
+    if autotune_alpha:
+        target_entropy = -torch.log(torch.tensor(1.0 / n_actions)).item()
+        log_alpha = torch.zeros(1, requires_grad=True, device=device)
+        alpha_optimizer = optim.Adam([log_alpha], lr=lr)
+    else:
+        log_alpha = torch.log(torch.tensor(alpha, device=device))
+
+    # --- Replay Buffer ---
+    replay_buffer = PrioritizedReplayMemory(buffer_size)
+
+    # --- Training Loop ---
+    state, _ = env.reset()
+    global_step = 0
+    start_time = time.time()
+    best_validation_reward = -float('inf')
+    best_model_state = None
+    epochs_no_improve = 0
+
+    while global_step < total_timesteps:
+        global_step += 1
+        
+        if global_step < learning_starts:
+            action = env.action_space.sample()
+        else:
+            action = agent.get_action(state, device)
+
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+        
+        # For PER, we need an initial error to push. We can calculate it.
+        with torch.no_grad():
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            action_tensor = torch.tensor([action], dtype=torch.long, device=device).unsqueeze(1)
             
-            architecture_params = {
-                'features_per_step': features_per_step, 'n_actions': n_actions,
-                'window_size': config['window_size'], 'hidden_size': final_hyperparams['hidden_size'],
-                'dropout_rate': final_hyperparams['dropout_rate']
-            }
-            
-            torch.save({
-                'model_state_dict': best_model_state,
-                'architecture_params': architecture_params
-            }, local_model_path)
-            
-            logging.info(f"Best model saved locally to {local_model_path}")
+            _, q1_pred, q2_pred = agent(state_tensor)
+            current_q = torch.min(q1_pred, q2_pred).gather(1, action_tensor)
 
-            if gcs_utils.is_gcs_path(original_model_dir):
-                logging.info(f"Uploading model artifacts from {local_model_dir} to {original_model_dir}...")
-                gcs_utils.upload_to_gcs(local_model_dir, original_model_dir)
-                
-        elif save_model:
-            logging.warning("Training finished, but no best model was saved (no improvement over initial).")
+            next_state_tensor = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+            next_policy_dist, next_q1_target, next_q2_target = critic_target(next_state_tensor)
+            min_next_q_target = torch.min(next_q1_target, next_q2_target)
+            next_action_probs = next_policy_dist.probs
+            next_log_action_probs = next_policy_dist.logits
+            v_next = (next_action_probs * (min_next_q_target - log_alpha.exp() * next_log_action_probs)).sum(dim=1, keepdim=True)
+            
+            q_target = torch.tensor([reward], device=device) + (1.0 - done) * gamma * v_next
+            
+            td_error = F.l1_loss(current_q, q_target).item()
 
+        replay_buffer.push(td_error, state, action, reward, next_state, done)
+        
+        state = next_state
+        if done:
+            state, _ = env.reset()
+
+        if len(replay_buffer) < batch_size or global_step < learning_starts:
+            continue
+
+        # --- Sample from buffer and prepare batch ---
+        transitions, idxs, is_weights = replay_buffer.sample(batch_size)
+        # Correctly unpack the batch of transitions
+        batch = Transition(*zip(*transitions))
+        
+        states = torch.tensor(np.array(batch.state), dtype=torch.float32, device=device)
+        actions = torch.tensor(np.array(batch.action), dtype=torch.long, device=device).unsqueeze(1)
+        rewards = torch.tensor(np.array(batch.reward), dtype=torch.float32, device=device).unsqueeze(1)
+        next_states = torch.tensor(np.array(batch.next_state), dtype=torch.float32, device=device)
+        dones = torch.tensor(np.array(batch.done), dtype=torch.float32, device=device).unsqueeze(1)
+        is_weights = torch.tensor(is_weights, dtype=torch.float32, device=device).unsqueeze(1)
+
+        # --- Critic Loss ---
+        with torch.no_grad():
+            next_policy_dist, next_q1_target, next_q2_target = critic_target(next_states)
+            min_next_q_target = torch.min(next_q1_target, next_q2_target)
+            
+            # We need action probabilities for the expectation
+            next_action_probs = next_policy_dist.probs
+            next_log_action_probs = next_policy_dist.logits # Using logits is more stable
+            
+            v_next = (next_action_probs * (min_next_q_target - log_alpha.exp() * next_log_action_probs)).sum(dim=1, keepdim=True)
+            q_target = rewards + (1.0 - dones) * gamma * v_next
+
+        _, q1_pred, q2_pred = agent(states)
+        q1_pred = q1_pred.gather(1, actions)
+        q2_pred = q2_pred.gather(1, actions)
+        
+        # Calculate TD errors for updating priorities
+        td_errors = (torch.abs(torch.min(q1_pred, q2_pred) - q_target)).detach()
+
+        # Apply importance sampling weights to the loss
+        critic_loss1 = F.mse_loss(q1_pred, q_target, reduction='none')
+        critic_loss2 = F.mse_loss(q2_pred, q_target, reduction='none')
+        critic_loss = ((critic_loss1 + critic_loss2) * is_weights).mean()
+        
+        critic_optimizer.zero_grad()
+        critic_loss.backward()
+        critic_optimizer.step()
+
+        # --- Actor and Alpha Loss ---
+        policy_dist, q1_pred_policy, q2_pred_policy = agent(states)
+        min_q_pred_policy = torch.min(q1_pred_policy, q2_pred_policy)
+        
+        # Advantage Normalization (Best Practice)
+        # We treat the Q-values as advantages and normalize them before the policy update.
+        advantages = min_q_pred_policy.detach()
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        action_probs = policy_dist.probs
+        log_action_probs = policy_dist.logits
+
+        actor_loss = (action_probs * (log_alpha.exp().detach() * log_action_probs - advantages)).mean()
+        
+        actor_optimizer.zero_grad()
+        actor_loss.backward()
+        actor_optimizer.step()
+
+        # Update priorities in the replay buffer
+        for i in range(batch_size):
+            replay_buffer.update(idxs[i], td_errors[i].item())
+
+        if autotune_alpha:
+            alpha_loss = -(log_alpha * (log_action_probs + target_entropy).detach()).mean()
+            alpha_optimizer.zero_grad()
+            alpha_loss.backward()
+            alpha_optimizer.step()
+            alpha = log_alpha.exp().item()
+
+        # --- Soft Update Target Network ---
+        for target_param, param in zip(critic_target.parameters(), agent.parameters()):
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
+
+        if global_step % eval_freq == 0 and global_step > 0:
+            sps = int(global_step / (time.time() - start_time))
+            
+            # --- Evaluation Phase ---
+            agent.eval()
+            val_state, _ = val_env.reset()
+            val_done = False
+            while not val_done:
+                val_action = agent.get_action(val_state, device)
+                val_state, _, val_terminated, val_truncated, _ = val_env.step(val_action)
+                val_done = val_terminated or val_truncated
+            
+            current_val_reward = val_env.total_reward
+            logging.info(f"--- Step: {global_step}/{total_timesteps} | SPS: {sps} | Val Reward: {current_val_reward:.2f} | Best: {best_validation_reward:.2f} ---")
+
+            # Check for improvement
+            if current_val_reward > best_validation_reward + early_stopping_threshold:
+                best_validation_reward = current_val_reward
+                epochs_no_improve = 0
+                if save_model:
+                    best_model_state = agent.state_dict().copy()
+                    logging.info(f"*** New best model state captured with reward {best_validation_reward:.2f} ***")
+            else:
+                epochs_no_improve += 1
+            
+            agent.train()
+
+            # Early stopping check
+            if epochs_no_improve >= early_stopping_patience:
+                logging.info(f"Early stopping triggered after {epochs_no_improve} evaluations without improvement.")
+                break
+            
+            # Pruning check for Optuna
+            if optuna_trial:
+                optuna_trial.report(current_val_reward, global_step)
+                if optuna_trial.should_prune():
+                    logging.info(f"Optuna trial {optuna_trial.number} pruned at step {global_step}.")
+                    # Return a value that Optuna understands as pruned.
+                    raise optuna.TrialPruned()
+
+
+    # --- Save Model ---
+    # Always save the last model if no improvement was found but saving is requested.
+    # This makes tests and short runs more predictable.
+    if save_model:
+        model_to_save = best_model_state if best_model_state is not None else agent.state_dict()
+        
+        model_filename = config.get('best_model_name', 'sac_model.pth')
+        model_path = os.path.join(local_model_dir, model_filename)
+        architecture_params = {
+            'features_per_step': features_per_step, 'n_actions': n_actions,
+            'window_size': window_size, 'hidden_size': hidden_size,
+            'dropout_rate': dropout_rate
+        }
+        torch.save({
+            'model_state_dict': model_to_save,
+            'architecture_params': architecture_params
+        }, model_path)
+        
+        if best_model_state is None:
+            logging.warning("No improvement over initial reward, but saving final model state as requested.")
+        logging.info(f"SAC model saved to {model_path}")
+
+    env.close()
+    val_env.close()
+    
+    # If the trial was pruned, this part won't be reached for that trial.
+    # For completed trials, return the best reward found.
     return best_validation_reward
-
-def main():
-    """Main function to train the model with parameters from command line."""
-    parser = argparse.ArgumentParser(description="Train a DQN Agent for a game.")
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate for the optimizer.')
-    parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor for future rewards.')
-    parser.add_argument('--hidden_size', type=int, default=128, help='Number of neurons in the hidden layer of the GRU.')
-    parser.add_argument('--dropout_rate', type=float, default=0.2, help='Dropout rate for regularization.')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training.')
-    parser.add_argument('--eps_decay', type=float, default=2000, help='Decay rate for epsilon-greedy exploration.')
-    parser.add_argument('--num_episodes', type=int, default=100, help='Number of episodes to train for.')
-    args = parser.parse_args()
-
-    train(
-        lr=args.lr,
-        gamma=args.gamma,
-        hidden_size=args.hidden_size,
-        dropout_rate=args.dropout_rate,
-        batch_size=args.batch_size,
-        eps_decay=args.eps_decay,
-        num_episodes=args.num_episodes,
-        save_model=True
-    )
-
-if __name__ == '__main__':
-    # Setup basic logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    main()

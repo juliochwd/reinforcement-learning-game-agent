@@ -1,0 +1,112 @@
+# ==================================================
+# Konfigurasi untuk Agen Game Reinforcement Learning
+# Direvisi untuk arsitektur SAC (Soft Actor-Critic)
+# ==================================================
+
+# --- Path & Nama File ---
+data_path: "data/databaru_from_api.csv"
+model_dir: "models/"
+log_dir: "logs/"
+best_model_name: "sac_model.pth"       # Diperbarui ke nama model SAC
+scaler_name: "feature_scaler.joblib"
+best_params_name: "best_sac_params.json" # Nama file parameter terbaik yang baru
+
+# --- Parameter Lingkungan & Model ---
+window_size: 10
+bet_percentages: [0.01, 0.025]
+
+# --- Parameter Reward Lingkungan ---
+payout_ratio: 0.92              # Imbal hasil kotor untuk taruhan yang menang (sesuai realita)
+transaction_cost: 1.0e-4
+
+# --- Parameter Pelatihan & HPT untuk SAC ---
+sac_hyperparameters:
+  # --- Parameter Tetap untuk Pelatihan ---
+  total_timesteps: 50000         # Total langkah untuk satu sesi pelatihan
+  total_timesteps_final: 100000   # Total langkah untuk pelatihan model final
+  total_timesteps_trial: 20000    # Langkah per trial untuk HPT
+  buffer_size: 50000
+  learning_starts: 5000
+  eval_freq: 10000
+  early_stopping_patience: 5
+  early_stopping_threshold: 0.01
+  autotune_alpha: True
+
+  # --- Ruang Pencarian untuk Optuna HPT ---
+  n_trials: 20 # Jumlah total trial untuk dijalankan
+  search_space:
+    lr:
+      low: 1.0e-5
+      high: 1.0e-3
+    gamma:
+      low: 0.95
+      high: 0.999
+    hidden_size: [128, 256]
+    dropout_rate:
+      low: 0.1
+      high: 0.4
+    batch_size: [64, 128]
+    tau: # Parameter soft update
+      low: 0.001
+      high: 0.02
+
+# --- Konfigurasi UI ---
+ui:
+  title: "Game Agent Control Center"
+  geometry: "900x700"
+  default_eta_text: "ETA: --:--"
+  initial_balance_display: "2,000,000.00"
+  # Pengaturan warna dan font sekarang dikelola oleh CustomTkinter
+  sidebar_buttons:
+    "Dashboard": "📊"
+    "Data Management": "💾"
+    "Train & Validate": "🏋️"
+    "Test Best Model": "📈"
+
+# --- Konfigurasi Web Agent & Scraping (Tidak berubah) ---
+web_agent:
+  login_url: "https://55v7nlu.com/#/login"
+  # ... (sisa konfigurasi web_agent tetap sama) ...
+  api_endpoint: "api.55fiveapi.com/api/webapi/GetNoaverageEmerdList"
+  initial_balance: 2000000
+  bet_unit_divisor: 1000 # e.g., 1000 units = 1000 currency
+  scraping:
+    max_pages: 400
+    zoom_level: "80%"
+  timeouts:
+    page_load: 60
+    element_wait: 30
+    api_wait: 15
+    recovery_threshold_seconds: 75
+    bet_placement_buffer_seconds: 7
+  timers:
+    post_login_sleep: 3
+    post_action_sleep: 1
+    popup_check_sleep: 0.5
+    api_retry_delay: 2
+  xpaths:
+    login:
+      user_input: { by: "NAME", value: "userNumber" }
+      password_input: { by: "XPATH", value: '//input[@placeholder="Password"]' }
+      submit_button: { by: "XPATH", value: '//button[text()="Log in"]' }
+    navigation:
+      win_go_menu: { by: "XPATH", value: "//div[@class='lottery' and .//span[normalize-space()='Win Go']]" }
+      win_go_1min_button: { by: "XPATH", value: "//div[contains(@class, 'GameList__C-item') and contains(., '1Min') and not(contains(., '30s'))]" }
+      my_account_button: { by: "XPATH", value: "//div[contains(@class, 'van-tabbar-item') and .//div[text()='My' or text()='Saya']]" }
+      logout_button: { by: "XPATH", value: "//div[contains(@class, 'mine-content-item') and .//div[text()='Log out']]" }
+      game_history_button: { by: "XPATH", value: "//div[contains(@class, 'mine-content-item') and .//div[text()='Game history']]" }
+      history_next_page_button: { by: "XPATH", value: "//div[contains(@class, 'GameRecord__C-foot-next')]" }
+    game_interface:
+      timer_display: { by: "XPATH", value: "//div[@class='TimeLeft__C-time']" }
+      period_display: { by: "XPATH", value: "//div[contains(@class, 'TimeLeft__C-id')]" }
+      balance_container: { by: "XPATH", value: "//div[contains(@class, 'Wallet__C-balance-l1')]" }
+      balance_value: { by: "XPATH", value: "./div" } # Relative to balance_container
+      balance_refresh_button: { by: "XPATH", value: "./i[contains(@class, 'van-icon-replay')]" } # Relative
+      bet_small_button: { by: "XPATH", value: "//div[contains(@class, 'Betting__C-foot-s')]" }
+      bet_big_button: { by: "XPATH", value: "//div[contains(@class, 'Betting__C-foot-b')]" }
+      bet_amount_input: { by: "XPATH", value: "//input[contains(@class, 'van-field__control')]" }
+      bet_confirm_button: { by: "XPATH", value: "//div[contains(@class, 'Betting__Popup-foot-s')]" }
+      popup_confirm_button: { by: "XPATH", value: "//div[@class='promptBtn' and text()='Confirm']" }
+      popup_close_icon: { by: "XPATH", value: "//i[contains(@class, 'van-icon-close')]" }
+    history_interface:
+      page_info: { by: "CLASS_NAME", value: "GameRecord__C-foot-page" }
