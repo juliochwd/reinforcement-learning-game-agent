@@ -12,8 +12,25 @@ echo "STARTING FULL VM PIPELINE (HPT + FINAL)"
 echo "============================================="
 
 # --- Virtual Environment Setup ---
-if [ ! -d "$VENV_DIR" ]; then
-    echo "--> Virtual environment not found. Creating and setting up..."
+VENV_HEALTHY=false
+# Periksa apakah direktori venv ada
+if [ -d "$VENV_DIR" ]; then
+    echo "--> Virtual environment found. Performing health check..."
+    # Coba aktifkan venv dan impor library kunci (misalnya, torch).
+    # Redirect output error ke null agar tidak mengacaukan log jika gagal.
+    if source "$VENV_DIR/bin/activate" && python -c "import torch; import pandas; import optuna" &> /dev/null; then
+        VENV_HEALTHY=true
+        echo "--> Health check PASSED. Skipping setup."
+        deactivate # Nonaktifkan setelah pemeriksaan kesehatan
+    else
+        echo "--> Health check FAILED. venv is corrupted or incomplete. Rebuilding..."
+        rm -rf "$VENV_DIR"
+    fi
+fi
+
+# Jika venv tidak sehat atau tidak ada, buat dari awal.
+if [ "$VENV_HEALTHY" = false ]; then
+    echo "--> Creating and setting up a fresh virtual environment..."
     echo "PROGRESS: 10%"
 
     echo "--> Creating new virtual environment with $PYTHON_CMD..."
@@ -28,11 +45,11 @@ if [ ! -d "$VENV_DIR" ]; then
     pip install -r "$PROJECT_DIR/requirements.txt"
     echo "--> Installing project in editable mode..."
     pip install -e .
-    # Deactivate after setup is complete
+    # Nonaktifkan setelah penyiapan selesai
     deactivate
     echo "PROGRESS: 50%"
 else
-    echo "--> Virtual environment found. Skipping setup."
+    # Jika venv sehat, kita sudah siap 50%
     echo "PROGRESS: 50%"
 fi
 
