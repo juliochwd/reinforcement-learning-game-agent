@@ -53,8 +53,11 @@ which $PYTHON_CMD || echo "WARNING: $PYTHON_CMD not found in PATH after activati
 
 # --- Run Hyperparameter Tuning ---
 echo "--> STAGE 1: Running Hyperparameter Search..."
-# Run the console script entry point created by setup.py
-run-hpt
+echo "--> Logging HPT output to /tmp/hpt.log on the VM."
+# Run the console script entry point, redirecting all output to a log file
+# This prevents the SSH session from hanging and allows for post-mortem debugging.
+run-hpt > /tmp/hpt.log 2>&1
+echo "--> HPT process finished. See /tmp/hpt.log on the VM for details."
 echo "PROGRESS: 80%"
 
 # --- Run Final Model Training ---
