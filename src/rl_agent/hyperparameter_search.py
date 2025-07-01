@@ -12,11 +12,16 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.rl_agent.train import train as train_sac
+# --- Local Imports ---
+# Moved inside the objective function to prevent premature loading of torch
+# from src.rl_agent.train import train as train_sac
 from src.utils.model_helpers import load_config
 from src.utils import prepare_data_splits
 
+
 def objective(trial, config, search_space, preprocessed_data):
+    # Import is done here to ensure it runs in the spawned process, not the main one.
+    from src.rl_agent.train import train as train_sac
     """
     The objective function for Optuna to optimize for SAC.
     It now accepts preprocessed data to avoid reloading it in every trial.
@@ -176,6 +181,7 @@ if __name__ == "__main__":
     # especially when using libraries like PyTorch that are not fork-safe.
     try:
         mp.set_start_method('spawn', force=True)
+        logging.info("Successfully set multiprocessing start method to 'spawn'.")
     except RuntimeError:
         # This can happen if the context is already set. We'll log a warning.
         logging.warning("Multiprocessing context already set. Assuming it's configured correctly.")
