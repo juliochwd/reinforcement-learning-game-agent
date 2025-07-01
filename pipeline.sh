@@ -3,8 +3,8 @@ set -e
 set -x # Enable debugging
 
 # --- Variables ---
-# Use the pre-installed, optimized Python 3.10 on the Deep Learning VM image
-PYTHON_CMD="python3.10"
+# Use the VM's default, pre-installed, and optimized python3 interpreter.
+PYTHON_CMD="python3"
 PROJECT_DIR=$(dirname "$(readlink -f "$0")")
 VENV_DIR="$PROJECT_DIR/venv"
 
