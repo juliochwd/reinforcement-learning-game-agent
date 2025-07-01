@@ -11,25 +11,16 @@ echo "============================================="
 echo "STARTING FULL VM PIPELINE (HPT + FINAL)"
 echo "============================================="
 
-# --- Virtual Environment Setup ---
-VENV_HEALTHY=false
-# Periksa apakah direktori venv ada
-if [ -d "$VENV_DIR" ]; then
-    echo "--> Virtual environment found. Performing health check..."
-    # Coba aktifkan venv dan impor library kunci (misalnya, torch).
-    # Redirect output error ke null agar tidak mengacaukan log jika gagal.
-    if source "$VENV_DIR/bin/activate" && python -c "import torch; import pandas; import optuna" &> /dev/null; then
-        VENV_HEALTHY=true
-        echo "--> Health check PASSED. Skipping setup."
-        deactivate # Nonaktifkan setelah pemeriksaan kesehatan
-    else
-        echo "--> Health check FAILED. venv is corrupted or incomplete. Rebuilding..."
-        rm -rf "$VENV_DIR"
-    fi
-fi
+# --- Environment Variable Constraints for VM ---
+# Force underlying numerical libraries (NumPy, PyTorch, etc.) to use a single thread.
+# This is the definitive fix for the 400% CPU usage issue on the VM.
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 
-# Jika venv tidak sehat atau tidak ada, buat dari awal.
-if [ "$VENV_HEALTHY" = false ]; then
+# --- Virtual Environment Setup ---
+# Simple check: if venv doesn't exist, create it.
+if [ ! -d "$VENV_DIR" ]; then
     echo "--> Creating and setting up a fresh virtual environment..."
     echo "PROGRESS: 10%"
 
