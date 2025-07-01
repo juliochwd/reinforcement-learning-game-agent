@@ -60,20 +60,16 @@ source "$VENV_DIR/bin/activate"
 echo "--- Checking Python path after activation ---"
 which $PYTHON_CMD || echo "WARNING: $PYTHON_CMD not found in PATH after activation."
 
-# --- Set PYTHONPATH to ensure project modules are found ---
-export PYTHONPATH=$PROJECT_DIR
-echo "--> PYTHONPATH set to: $PYTHONPATH"
-
 # --- Run Hyperparameter Tuning ---
 echo "--> STAGE 1: Running Hyperparameter Search..."
-# The python script is expected to print its own PROGRESS updates
-$PYTHON_CMD "$PROJECT_DIR/src/rl_agent/hyperparameter_search.py"
+# Run as a module to ensure correct package resolution
+$PYTHON_CMD -m src.rl_agent.hyperparameter_search
 echo "PROGRESS: 80%"
 
 # --- Run Final Model Training ---
 echo "--> STAGE 2: Running Final Model Training..."
-# The python script is expected to print its own PROGRESS updates
-$PYTHON_CMD "$PROJECT_DIR/train_final_model.py"
+# Run as a module to ensure correct package resolution
+$PYTHON_CMD -m train_final_model
 echo "PROGRESS: 100%"
 
 # --- Deactivate ---

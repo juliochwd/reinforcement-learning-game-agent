@@ -8,9 +8,6 @@ import json
 import hashlib
 import argparse
 import multiprocessing as mp
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 # --- Local Imports ---
 # Moved inside the objective function to prevent premature loading of torch
