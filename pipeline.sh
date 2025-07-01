@@ -12,13 +12,24 @@ echo "STARTING FULL VM PIPELINE (HPT + FINAL)"
 echo "============================================="
 
 # --- Virtual Environment Setup ---
-# Menghapus venv yang ada secara paksa untuk memastikan pembangunan ulang dengan setup.py terbaru.
-# Ini diperlukan satu kali untuk membuat entry points console script.
-echo "--> Forcing a one-time rebuild of the virtual environment to apply new setup."
-rm -rf "$VENV_DIR"
+VENV_HEALTHY=false
+# Periksa apakah direktori venv ada
+if [ -d "$VENV_DIR" ]; then
+    echo "--> Virtual environment found. Performing health check..."
+    # Coba aktifkan venv dan impor library kunci (misalnya, torch).
+    # Redirect output error ke null agar tidak mengacaukan log jika gagal.
+    if source "$VENV_DIR/bin/activate" && python -c "import torch; import pandas; import optuna" &> /dev/null; then
+        VENV_HEALTHY=true
+        echo "--> Health check PASSED. Skipping setup."
+        deactivate # Nonaktifkan setelah pemeriksaan kesehatan
+    else
+        echo "--> Health check FAILED. venv is corrupted or incomplete. Rebuilding..."
+        rm -rf "$VENV_DIR"
+    fi
+fi
 
-# Selalu buat venv baru pada eksekusi ini
-if [ ! -d "$VENV_DIR" ]; then
+# Jika venv tidak sehat atau tidak ada, buat dari awal.
+if [ "$VENV_HEALTHY" = false ]; then
     echo "--> Creating and setting up a fresh virtual environment..."
     echo "PROGRESS: 10%"
 
