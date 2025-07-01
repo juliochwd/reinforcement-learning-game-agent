@@ -195,9 +195,21 @@ cd $REMOTE_PROJECT_PATH && bash pipeline.sh
                 errors='replace'
             )
 
-            # Log stdout
+            # Log stdout and handle progress updates
             for line in process.stdout:
-                logging.info(line.strip())
+                line = line.strip()
+                if line.startswith("PROGRESS:"):
+                    try:
+                        # Extract percentage, e.g., "PROGRESS: 50%" -> 50
+                        progress_str = line.split(':')[1].strip().replace('%', '')
+                        progress_value = int(progress_str)
+                        # GUI update must be thread-safe, so we put it in the queue
+                        if self.gui_queue:
+                            self.gui_queue.put({"type": "progress", "value": progress_value / 100.0})
+                    except (ValueError, IndexError) as e:
+                        logging.warning(f"Could not parse progress line: {line} - Error: {e}")
+                else:
+                    logging.info(line)
 
             # Log stderr after stdout is done
             stderr_output = process.stderr.read()
