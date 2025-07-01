@@ -110,3 +110,10 @@ web_agent:
       popup_close_icon: { by: "XPATH", value: "//i[contains(@class, 'van-icon-close')]" }
     history_interface:
       page_info: { by: "CLASS_NAME", value: "GameRecord__C-foot-page" }
+
+# --- Konfigurasi Pipeline VM ---
+vm_pipeline:
+  user: "juliowadudoko"
+  host: "34.101.233.3"
+  ssh_key_path: "C:/Users/bpsku/.ssh/id_rsa" # Ganti 'bpsku' jika nama pengguna Windows Anda berbeda
+  remote_script_path: "/home/juliowadudoko/reinforcement-learning-game-agent/pipeline.sh"

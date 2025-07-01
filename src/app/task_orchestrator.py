@@ -3,6 +3,7 @@ import logging
 import tkinter as tk
 import sys
 import os
+import subprocess
 
 # --- Path Setup ---
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,9 +115,62 @@ class TaskOrchestrator:
         )
         logging.info("Single SAC training session finished.")
 
+    def run_vm_training_pipeline(self):
+        """
+        Executes the training pipeline on a remote VM via SSH.
+        """
+        logging.info("--- Preparing to run pipeline on VM ---")
+        vm_config = self.config.get('vm_pipeline')
+        if not vm_config:
+            logging.error("VM pipeline configuration ('vm_pipeline') not found in config.yaml.")
+            return
+
+        try:
+            ssh_command = [
+                'ssh',
+                '-i', vm_config['ssh_key_path'],
+                f"{vm_config['user']}@{vm_config['host']}",
+                f"bash {vm_config['remote_script_path']}"
+            ]
+            
+            logging.info(f"Executing command: {' '.join(ssh_command)}")
+            
+            # Use Popen to stream output in real-time
+            process = subprocess.Popen(
+                ssh_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+
+            # Log stdout
+            for line in process.stdout:
+                logging.info(line.strip())
+
+            # Log stderr after stdout is done
+            stderr_output = process.stderr.read()
+            if stderr_output:
+                logging.error("--- VM Script Errors ---")
+                logging.error(stderr_output.strip())
+                
+            process.wait()
+            
+            if process.returncode == 0:
+                logging.info("--- VM pipeline finished successfully. ---")
+            else:
+                logging.error(f"--- VM pipeline failed with exit code {process.returncode}. ---")
+
+        except FileNotFoundError:
+            logging.error("Error: 'ssh' command not found. Is OpenSSH client installed and in your system's PATH?")
+        except Exception as e:
+            logging.error(f"An error occurred while running the VM pipeline: {e}", exc_info=True)
+
     def start_task(self, task_name, button, progress_bar, eta_label, log_widget):
         task_map = {
             'full_train': self.run_offline_training_pipeline,
+            'full_train_vm': self.run_vm_training_pipeline,
             'single_train': self.run_single_training,
             'final_train': train_final_model.main,
             'hpt': hyperparameter_search.main,

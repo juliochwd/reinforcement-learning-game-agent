@@ -280,6 +280,9 @@ class PageTrain(PageBase):
         self.full_train_button = ctk.CTkButton(button_frame, text="Run Full Pipeline (HPT + Final Training)", command=lambda: self.start_task_by_name('full_train', self.full_train_button))
         self.full_train_button.pack(fill=tk.X, pady=2)
 
+        self.vm_train_button = ctk.CTkButton(button_frame, text="Run Full Pipeline on VM", command=lambda: self.start_task_by_name('full_train_vm', self.vm_train_button))
+        self.vm_train_button.pack(fill=tk.X, pady=2)
+
         self.single_train_button = ctk.CTkButton(button_frame, text="Run Single Training Session", command=lambda: self.start_task_by_name('single_train', self.single_train_button))
         self.single_train_button.pack(fill=tk.X, pady=2)
 
