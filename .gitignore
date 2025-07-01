@@ -99,6 +99,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+temp_env/
 ENV/
 env.bak/
 venv.bak/
@@ -131,22 +132,11 @@ cython_debug/
 .vscode/
 
 # --- Project-specific ignores ---
-# Ignore configuration file with credentials
-config.yaml
 
-# Ignore data files
-data/
-*.csv
-*.xlsx
-
-# Ignore model files
-models/
-*.pth
-*.joblib
-
-# Ignore log files
-logs/
-*.log
+# Ignore database files
+*.db
+*.sqlite
+*.sqlite3
 
 # Ignore MLflow tracking data
 mlruns/
