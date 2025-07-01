@@ -7,6 +7,7 @@ import time
 import json
 import hashlib
 import argparse
+import multiprocessing as mp
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -107,11 +108,41 @@ def main(n_jobs_override=None):
     
     start_time = time.time()
 
+    # --- Progress Callback ---
+    def progress_callback(study, trial):
+        """
+        Callback to print progress after each trial.
+        This is used to update the GUI when running on a VM.
+        """
+        # We start at 50% and go to 80% for the HPT phase
+        base_progress = 50
+        hpt_progress_range = 30  # (80% - 50%)
+        
+        # Calculate completion ratio for HPT
+        completed_trials = trial.number + 1
+        total_trials = n_trials
+        
+        # Calculate the progress within the HPT phase's allocated range
+        current_hpt_progress = (completed_trials / total_trials) * hpt_progress_range
+        
+        # Total progress is the base + current HPT progress
+        total_progress = base_progress + current_hpt_progress
+        
+        # Print in a format that the orchestrator can parse
+        print(f"PROGRESS: {int(total_progress)}%")
+        # Flush the output to ensure it's sent immediately
+        sys.stdout.flush()
+
     # The objective function now needs the config, search_space, and data passed to it
     objective_with_args = lambda trial: objective(trial, config, search_space, preprocessed_data)
 
-    # Start the optimization
-    study.optimize(objective_with_args, n_trials=n_trials, n_jobs=n_jobs)
+    # Start the optimization with the callback
+    study.optimize(
+        objective_with_args, 
+        n_trials=n_trials, 
+        n_jobs=n_jobs,
+        callbacks=[progress_callback]
+    )
 
     # --- Log the results ---
     total_duration = time.time() - start_time
@@ -141,6 +172,14 @@ def main(n_jobs_override=None):
     logging.info("\nTo run in parallel, execute this script in multiple terminals simultaneously.")
 
 if __name__ == "__main__":
+    # Force 'spawn' start method for multiprocessing to ensure stability on Linux/macOS,
+    # especially when using libraries like PyTorch that are not fork-safe.
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        # This can happen if the context is already set. We'll log a warning.
+        logging.warning("Multiprocessing context already set. Assuming it's configured correctly.")
+
     # Setup basic logging for direct script execution
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
