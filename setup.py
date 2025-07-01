@@ -7,7 +7,7 @@ setup(
     package_dir={"": "src"},
     entry_points={
         'console_scripts': [
-            'run-hpt = src.rl_agent.hyperparameter_search:main',
+            'run-hpt = rl_agent.hyperparameter_search:main',
             'train-final = train_final_model:main',
         ],
     },

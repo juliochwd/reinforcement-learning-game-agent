@@ -3,8 +3,8 @@ import json
 import os
 import sys
 
-from src.rl_agent.train import train
-from src.utils.model_helpers import load_config
+from rl_agent.train import train
+from utils.model_helpers import load_config
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

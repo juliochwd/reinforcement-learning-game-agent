@@ -12,13 +12,13 @@ import multiprocessing as mp
 # --- Local Imports ---
 # Moved inside the objective function to prevent premature loading of torch
 # from src.rl_agent.train import train as train_sac
-from src.utils.model_helpers import load_config
-from src.utils import prepare_data_splits
+from utils.model_helpers import load_config
+from utils import prepare_data_splits
 
 
 def objective(trial, config, search_space, preprocessed_data):
     # Import is done here to ensure it runs in the spawned process, not the main one.
-    from src.rl_agent.train import train as train_sac
+    from rl_agent.train import train as train_sac
     """
     The objective function for Optuna to optimize for SAC.
     It now accepts preprocessed data to avoid reloading it in every trial.

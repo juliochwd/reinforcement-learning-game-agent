@@ -9,8 +9,8 @@ import os
 import yaml
 import logging
 import torch
-from src.rl_agent.model import ActorCriticSAC_GRU
-from src.rl_agent.environment import TradingEnv
+from rl_agent.model import ActorCriticSAC_GRU
+from rl_agent.environment import TradingEnv
 
 def load_config():
     """
