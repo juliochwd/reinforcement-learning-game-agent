@@ -99,6 +99,8 @@ def main():
     logging.info("--- Evaluation Finished ---")
     logging.info(f"Final Balance on Test Set: {test_env.balance:,.2f}")
     logging.info(f"Total Profit on Test Set: {total_reward:,.2f}")
+    final_sharpe_ratio = test_env.calculate_episode_sharpe()
+    logging.info(f"Consistency Score (Sharpe Ratio) on Test Set: {final_sharpe_ratio:.4f}")
     if total_bets > 0:
         logging.info(f"Win Rate on Bets: {win_rate:.2f}% ({correct_bets}/{total_bets})")
     else:

@@ -280,9 +280,6 @@ class PageTrain(PageBase):
         self.full_train_button = ctk.CTkButton(button_frame, text="Run Full Pipeline (HPT + Final Training)", command=lambda: self.start_task_by_name('full_train', self.full_train_button))
         self.full_train_button.pack(fill=tk.X, pady=2)
 
-        self.vm_train_button = ctk.CTkButton(button_frame, text="Run Full Pipeline on VM", command=lambda: self.start_task_by_name('full_train_vm', self.vm_train_button))
-        self.vm_train_button.pack(fill=tk.X, pady=2)
-
         self.single_train_button = ctk.CTkButton(button_frame, text="Run Single Training Session", command=lambda: self.start_task_by_name('single_train', self.single_train_button))
         self.single_train_button.pack(fill=tk.X, pady=2)
 
@@ -291,6 +288,10 @@ class PageTrain(PageBase):
 
         self.final_train_button = ctk.CTkButton(button_frame, text="Train Final Model with Best Params", command=lambda: self.start_task_by_name('final_train', self.final_train_button))
         self.final_train_button.pack(fill=tk.X, pady=2)
+
+        # --- Tombol untuk Promosi Model ---
+        self.promote_button = ctk.CTkButton(button_frame, text="Promote Best Candidate Model", command=self.promote_model, fg_color="green")
+        self.promote_button.pack(fill=tk.X, pady=(10, 2)) # Add some space above
         
         self.estimate_button = ctk.CTkButton(button_frame, text="Estimate Training Time", command=lambda: self.start_task_by_name('estimate_time', self.estimate_button))
         self.estimate_button.pack(fill=tk.X, pady=2)
@@ -305,6 +306,14 @@ class PageTrain(PageBase):
         self.controller.active_log_widget = self.log_widget
         self.controller.task_orchestrator.start_task(
             task_name, button, self.progress_bar, self.eta_label, self.log_widget
+        )
+
+    def promote_model(self):
+        """Handles the model promotion task."""
+        self.controller.active_log_widget = self.log_widget
+        # This task doesn't need a progress bar, so we pass None
+        self.controller.task_orchestrator.start_task(
+            'promote_model', self.promote_button, None, None, self.log_widget
         )
 
 class PageEval(PageBase):

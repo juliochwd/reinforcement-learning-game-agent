@@ -13,43 +13,47 @@ best_params_name: "best_sac_params.json" # Nama file parameter terbaik yang baru
 
 # --- Parameter Lingkungan & Model ---
 window_size: 10
-bet_percentages: [0.01, 0.025]
+bet_percentages: [0.01]
 
 # --- Parameter Reward Lingkungan ---
 payout_ratio: 0.92              # Imbal hasil kotor untuk taruhan yang menang (sesuai realita)
 transaction_cost: 1.0e-4
+reward_strategy: "sharpe_proxy"      # Pilihan: "direct_pnl", "sharpe_proxy"
+reward_sharpe_window: 30             # Jendela untuk kalkulasi Sharpe
+hold_penalty: 0.01                   # Penalti untuk setiap aksi 'Tahan'
 
 # --- Parameter Pelatihan & HPT untuk SAC ---
 sac_hyperparameters:
   # --- Parameter Tetap untuk Pelatihan ---
-  total_timesteps: 50000         # Total langkah untuk satu sesi pelatihan
-  total_timesteps_final: 200000   # Total langkah untuk pelatihan model final
-  total_timesteps_trial: 20000    # Langkah per trial untuk HPT
-  buffer_size: 1000000
-  learning_starts: 5000
-  eval_freq: 10000
-  early_stopping_patience: 5
+  total_timesteps: 20000         # Total langkah untuk satu sesi pelatihan
+  total_timesteps_final: 45000   # Total langkah untuk pelatihan model final
+  total_timesteps_trial: 15000    # Langkah per trial untuk HPT
+  buffer_size: 30000
+  learning_starts: 2500
+  eval_freq: 2500
+  early_stopping_patience: 4
   early_stopping_threshold: 0.01
   autotune_alpha: True
-  n_jobs: 1 # Diubah ke 1 untuk mencegah kehabisan memori di VM.
+  n_jobs: 1 # 
+  
 
   # --- Ruang Pencarian untuk Optuna HPT ---
-  n_trials: 50 # Jumlah total trial untuk dijalankan
+  n_trials: 20 # Jumlah total trial untuk dijalankan
   search_space:
     lr:
       low: 1.0e-5
-      high: 1.0e-3
+      high: 8.0e-4
     gamma:
       low: 0.95
-      high: 0.999
-    hidden_size: [128, 256]
+      high: 0.995
+    hidden_size: [64, 128]
     dropout_rate:
-      low: 0.1
-      high: 0.4
-    batch_size: [128, 256]
+      low: 0.28
+      high: 0.5
+    batch_size: [64, 128]
     tau: # Parameter soft update
-      low: 0.001
-      high: 0.02
+      low: 0.005
+      high: 0.01
 
 # --- Konfigurasi UI ---
 ui:
@@ -66,7 +70,7 @@ ui:
 
 # --- Konfigurasi Web Agent & Scraping (Tidak berubah) ---
 web_agent:
-  login_url: "https://55v7nlu.com/#/login"
+  login_url: "https://wirgako.com/#/login"
   # ... (sisa konfigurasi web_agent tetap sama) ...
   api_endpoint: "api.55fiveapi.com/api/webapi/GetNoaverageEmerdList"
   initial_balance: 2000000
@@ -111,10 +115,3 @@ web_agent:
       popup_close_icon: { by: "XPATH", value: "//i[contains(@class, 'van-icon-close')]" }
     history_interface:
       page_info: { by: "CLASS_NAME", value: "GameRecord__C-foot-page" }
-
-# --- Konfigurasi Pipeline VM ---
-vm_pipeline:
-  user: "juliowadudoko"
-  host: "34.101.233.3"
-  ssh_key_path: "C:/Users/bpsku/.ssh/id_rsa" # Ganti 'bpsku' jika nama pengguna Windows Anda berbeda
-  remote_script_path: "/home/juliowadudoko/reinforcement-learning-game-agent/pipeline.sh"

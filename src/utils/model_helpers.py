@@ -79,6 +79,9 @@ def create_environment(features_df, targets_df, config):
         'window_size': config['window_size'],
         'bet_percentages': config['bet_percentages'],
         'payout_ratio': config['payout_ratio'],
-        'transaction_cost': config['transaction_cost']
+        'transaction_cost': config['transaction_cost'],
+        'reward_strategy': config.get('reward_strategy', 'direct_pnl'), # Gunakan .get untuk fallback
+        'reward_sharpe_window': config.get('reward_sharpe_window', 30),
+        'hold_penalty': config.get('hold_penalty', 0.0)
     }
     return TradingEnv(features_df=features_df, targets_df=targets_df, **env_params)

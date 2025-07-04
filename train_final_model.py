@@ -3,8 +3,13 @@ import json
 import os
 import sys
 
-from rl_agent.train import train
-from utils.model_helpers import load_config
+# --- Path Setup ---
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.rl_agent.train import train
+from src.utils.model_helpers import load_config
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,20 +39,33 @@ def main():
     for key, value in best_params.items():
         logging.info(f"  {key.replace('_', ' ').title()}: {value}")
     
-    final_timesteps = config.get('sac_hyperparameters', {}).get('total_timesteps_final', 200000)
-    logging.info(f"  Total Timesteps: {final_timesteps}")
+    sac_config = config.get('sac_hyperparameters', {})
+    final_timesteps = sac_config.get('total_timesteps_final', 200000)
+    
+    # --- Load all relevant parameters from config ---
+    train_params = {
+        'lr': best_params['lr'],
+        'gamma': best_params['gamma'],
+        'hidden_size': best_params['hidden_size'],
+        'dropout_rate': best_params['dropout_rate'],
+        'batch_size': best_params['batch_size'],
+        'tau': best_params['tau'],
+        'total_timesteps': final_timesteps,
+        'eval_freq': sac_config.get('eval_freq', 5000),
+        'learning_starts': sac_config.get('learning_starts', 2500),
+        'buffer_size': sac_config.get('buffer_size', 1_000_000),
+        'early_stopping_patience': sac_config.get('early_stopping_patience', 5),
+        'early_stopping_threshold': sac_config.get('early_stopping_threshold', 0.01),
+        'autotune_alpha': sac_config.get('autotune_alpha', True),
+        'save_model': True  # Ensure the final model is saved
+    }
 
-    # Call the SAC training function with the loaded hyperparameters
-    train(
-        lr=best_params['lr'],
-        gamma=best_params['gamma'],
-        hidden_size=best_params['hidden_size'],
-        dropout_rate=best_params['dropout_rate'],
-        batch_size=best_params['batch_size'],
-        tau=best_params['tau'],
-        total_timesteps=final_timesteps,
-        save_model=True  # Ensure the final model is saved
-    )
+    logging.info("Final training parameters:")
+    for key, value in train_params.items():
+        logging.info(f"  {key.replace('_', ' ').title()}: {value}")
+
+    # Call the SAC training function with the complete set of parameters
+    train(**train_params)
 
     logging.info("Final model training complete.")
 

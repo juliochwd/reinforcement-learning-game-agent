@@ -19,5 +19,6 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDN4RQhNR1zWsED28IT2D2IeeMm8DGFsTa5lTEFwImG
 
 ssh juliowadudoko@34.101.233.3 ( untuk jalan VM)
 cd reinforcement-learning-game-agent
-ssh -i "C:/Users/bpsku/.ssh/id_rsa" juliowadudoko@34.101.233.3
+ssh -i "C:/Users/bpsku/.ssh/id_rsa" juliowadudoko@34.101.233.3 
+6ST@ekkBBS4NQjm
 

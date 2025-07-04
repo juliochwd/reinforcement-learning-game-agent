@@ -6,6 +6,7 @@ import numpy as np
 import logging
 import os
 import time
+from datetime import datetime
 import optuna
 import pandas as pd
 import joblib
@@ -33,7 +34,7 @@ def train(
     autotune_alpha=True,
     total_timesteps=100_000,
     learning_starts=5000,
-    eval_freq=10000,
+    eval_freq=5000,
     early_stopping_patience=5,
     early_stopping_threshold=0.01,
     save_model=True,
@@ -232,6 +233,14 @@ def train(
             alpha_optimizer.step()
             alpha = log_alpha.exp().item()
 
+        # --- LOG DIAGNOSTIK ---
+        if global_step % 2000 == 0: # Log setiap 2000 langkah
+            logging.debug(f"TRAIN_CONSUME (Step: {global_step}): "
+                          f"Sampled Rewards (Min/Mean/Max): {rewards.min():.4f}/{rewards.mean():.4f}/{rewards.max():.4f}, "
+                          f"Q-Targets (Min/Mean/Max): {q_target.min():.4f}/{q_target.mean():.4f}/{q_target.max():.4f}, "
+                          f"TD-Errors (Min/Mean/Max): {td_errors.min():.4f}/{td_errors.mean():.4f}/{td_errors.max():.4f}")
+        # --- AKHIR LOG DIAGNOSTIK ---
+
         # --- Soft Update Target Network ---
         for target_param, param in zip(critic_target.parameters(), agent.parameters()):
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
@@ -248,16 +257,31 @@ def train(
                 val_state, _, val_terminated, val_truncated, _ = val_env.step(val_action)
                 val_done = val_terminated or val_truncated
             
-            current_val_reward = val_env.total_reward
-            logging.info(f"--- Step: {global_step}/{total_timesteps} | SPS: {sps} | Val Reward: {current_val_reward:.2f} | Best: {best_validation_reward:.2f} ---")
+            current_val_reward = val_env.calculate_episode_sharpe()
+            logging.info(f"--- Step: {global_step}/{total_timesteps} | SPS: {sps} | Val Consistency Score: {current_val_reward:.4f} | Best: {best_validation_reward:.4f} ---")
 
             # Check for improvement
             if current_val_reward > best_validation_reward + early_stopping_threshold:
                 best_validation_reward = current_val_reward
                 epochs_no_improve = 0
                 if save_model:
-                    best_model_state = agent.state_dict().copy()
-                    logging.info(f"*** New best model state captured with reward {best_validation_reward:.2f} ***")
+                    # --- Anti-Race Condition Save Logic ---
+                    # Save candidate models with unique names to avoid overwrites.
+                    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    model_filename = f"candidate_reward_{current_val_reward:.4f}_{timestamp}.pth"
+                    model_path = os.path.join(local_model_dir, model_filename)
+                    
+                    architecture_params = {
+                        'features_per_step': features_per_step, 'n_actions': n_actions,
+                        'window_size': window_size, 'hidden_size': hidden_size,
+                        'dropout_rate': dropout_rate
+                    }
+                    
+                    torch.save({
+                        'model_state_dict': agent.state_dict(),
+                        'architecture_params': architecture_params
+                    }, model_path)
+                    logging.info(f"*** New candidate model saved to {model_path} with reward {current_val_reward:.4f} ***")
             else:
                 epochs_no_improve += 1
             
@@ -277,28 +301,8 @@ def train(
                     raise optuna.TrialPruned()
 
 
-    # --- Save Model ---
-    # Always save the last model if no improvement was found but saving is requested.
-    # This makes tests and short runs more predictable.
-    if save_model:
-        model_to_save = best_model_state if best_model_state is not None else agent.state_dict()
-        
-        model_filename = config.get('best_model_name', 'sac_model.pth')
-        model_path = os.path.join(local_model_dir, model_filename)
-        architecture_params = {
-            'features_per_step': features_per_step, 'n_actions': n_actions,
-            'window_size': window_size, 'hidden_size': hidden_size,
-            'dropout_rate': dropout_rate
-        }
-        torch.save({
-            'model_state_dict': model_to_save,
-            'architecture_params': architecture_params
-        }, model_path)
-        
-        if best_model_state is None:
-            logging.warning("No improvement over initial reward, but saving final model state as requested.")
-        logging.info(f"SAC model saved to {model_path}")
-
+    # The final model is no longer saved here to prevent race conditions.
+    # Use the 'promote_best_model.py' script to select the best candidate after all training runs are complete.
     env.close()
     val_env.close()
     

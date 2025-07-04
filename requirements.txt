@@ -1,19 +1,31 @@
-# Core ML & RL
-torch
-numpy
-pandas
-scikit-learn
+attr
+colorama
+cryptography
+docutils
+filelock
 gymnasium
-optuna
-
-# Utilities
+ipython
+ipywidgets
 joblib
+keyring
+matplotlib
+numpy
+optuna
+pandas
+Pillow
+protobuf
+pyOpenSSL
+pytest
 PyYAML
-
-# GUI
+redis
+scikit_learn
+selenium
+selenium_wire
+setuptools
+Sphinx
+statsmodels
+torch
+urllib3_secure_extra
+zstandard
 customtkinter
 Pillow
-
-# Data Scraping
-selenium
-selenium-wire

@@ -13,7 +13,8 @@ class TradingEnv(gym.Env):
 
     def __init__(self, features_df, targets_df, window_size=10,
                  initial_balance=2000000, bet_percentages=[0.01, 0.025],
-                 payout_ratio=0.95, transaction_cost=1e-4):
+                 payout_ratio=0.95, transaction_cost=1e-4,
+                 reward_strategy="direct_pnl", reward_sharpe_window=30, hold_penalty=0.0):
         """
         Inisialisasi environment.
         
@@ -28,6 +29,10 @@ class TradingEnv(gym.Env):
         self.bet_percentages = bet_percentages
         self.payout_ratio = payout_ratio
         self.transaction_cost = transaction_cost
+        self.reward_strategy = reward_strategy
+        self.reward_sharpe_window = reward_sharpe_window
+        self.hold_penalty = hold_penalty
+        self.returns_history = [] # Riwayat imbal hasil per taruhan
         
         # Pastikan kedua dataframe memiliki indeks yang selaras
         if not features_df.index.equals(targets_df.index):
@@ -71,6 +76,7 @@ class TradingEnv(gym.Env):
         self.current_step = self.window_size 
         self.balance = self.initial_balance
         self.total_reward = 0
+        self.returns_history = [] # Reset riwayat di sini
         
         initial_observation = self._get_observation()
         info = {'balance': self.balance}
@@ -83,11 +89,8 @@ class TradingEnv(gym.Env):
         
         previous_balance = self.balance
         bet_amount = 0
-        reward = 0
-
-        if action == 0:  # Aksi 'Tahan'
-            reward = 0 # Tidak ada reward atau penalti untuk menahan
-        else:  # Aksi taruhan
+        
+        if action > 0:  # Aksi taruhan
             num_bet_levels = len(self.bet_percentages)
             
             if 1 <= action <= num_bet_levels:
@@ -102,19 +105,46 @@ class TradingEnv(gym.Env):
             bet_amount = min(bet_amount, self.balance)
 
             if self.balance > 0 and bet_amount > 0:
-                # Terapkan biaya transaksi
-                transaction_fee = bet_amount * self.transaction_cost
-                
                 if bet_choice == actual_outcome:
-                    # Kemenangan: reward adalah profit bersih
+                    # Kemenangan
                     profit = bet_amount * self.payout_ratio
                     self.balance += profit
-                    reward = profit - transaction_fee # Reward adalah profit aktual
                 else:
-                    # Kekalahan: reward adalah kerugian bersih
+                    # Kekalahan
                     self.balance -= bet_amount
-                    reward = -bet_amount - transaction_fee # Reward adalah kerugian aktual
         
+        # --- Logika Reward yang Didesain Ulang ---
+        current_return_pct = 0.0
+        if bet_amount > 0: # Hanya jika ada taruhan
+            # Hitung return sebagai persentase dari jumlah taruhan
+            current_return_pct = (self.balance - previous_balance) / bet_amount
+            self.returns_history.append(current_return_pct)
+            if len(self.returns_history) > self.reward_sharpe_window:
+                self.returns_history.pop(0)
+
+        reward = 0.0
+        # Pilar 1: Hitung reward konsistensi
+        if self.reward_strategy == "sharpe_proxy":
+            if len(self.returns_history) >= 2:
+                returns_np = np.array(self.returns_history)
+                # Reward adalah skor konsistensi (mean dibagi std dev)
+                reward = np.mean(returns_np) / (np.std(returns_np) + 1e-9)
+        else: # Fallback ke strategi lama (profit/loss langsung)
+            reward = self.balance - previous_balance
+
+        # Pilar 2: Terapkan penalti aktivitas
+        if action == 0:
+            reward -= self.hold_penalty
+        
+        # --- LOG DIAGNOSTIK ---
+        if self.current_step % 200 == 0: # Log setiap 200 langkah untuk tidak membanjiri
+            logging.debug(f"REWARD_CALC (Step: {self.current_step}): Action={action}, "
+                          f"Return%={current_return_pct:.4f}, "
+                          f"SharpeProxy={np.mean(self.returns_history) / (np.std(self.returns_history) + 1e-9):.4f} (dari {len(self.returns_history)} data), "
+                          f"HoldPenaltyApplied={self.hold_penalty if action == 0 else 0}, "
+                          f"FinalReward={reward:.4f}")
+        # --- AKHIR LOG DIAGNOSTIK ---
+
         self.total_reward = self.balance - self.initial_balance
         self.current_step += 1
 
@@ -126,3 +156,13 @@ class TradingEnv(gym.Env):
         info = {'total_reward': self.total_reward, 'balance': self.balance, 'bet_amount': bet_amount}
 
         return next_observation, reward, terminated, truncated, info
+
+    def calculate_episode_sharpe(self):
+        """Menghitung Sharpe Ratio untuk seluruh episode."""
+        if len(self.returns_history) < 2:
+            return 0.0
+        returns_np = np.array(self.returns_history)
+        std_dev = np.std(returns_np)
+        if std_dev < 1e-9: # Hindari pembagian dengan nol
+            return 0.0
+        return np.mean(returns_np) / std_dev

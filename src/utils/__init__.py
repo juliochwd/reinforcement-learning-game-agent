@@ -3,7 +3,7 @@ import os
 import logging
 import joblib
 from sklearn.preprocessing import MinMaxScaler
-from features.feature_engineering import create_features
+from src.features.feature_engineering import create_features
 
 def prepare_data_splits(data_path, train_ratio=0.7, val_ratio=0.15):
     """

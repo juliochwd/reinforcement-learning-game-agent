@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "D:/Jadi/All Script/final/Bisa Dipakai/Kembangkan ini/final/reinforcement-learning-game-agent"
+      ]
+    }
+  }
+}

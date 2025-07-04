@@ -6,19 +6,17 @@ import os
 import time
 import json
 import hashlib
-import argparse
-import multiprocessing as mp
 
-# --- Local Imports ---
-# Moved inside the objective function to prevent premature loading of torch
-# from src.rl_agent.train import train as train_sac
-from utils.model_helpers import load_config
-from utils import prepare_data_splits
+# --- Path Setup ---
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
+from src.rl_agent.train import train as train_sac
+from src.utils.model_helpers import load_config
+from src.utils import prepare_data_splits
 
 def objective(trial, config, search_space, preprocessed_data):
-    # Import is done here to ensure it runs in the spawned process, not the main one.
-    from rl_agent.train import train as train_sac
     """
     The objective function for Optuna to optimize for SAC.
     It now accepts preprocessed data to avoid reloading it in every trial.
@@ -33,7 +31,14 @@ def objective(trial, config, search_space, preprocessed_data):
     batch_size = trial.suggest_categorical('batch_size', search_space['batch_size'])
     tau = trial.suggest_float('tau', search_space['tau']['low'], search_space['tau']['high'])
     
+    # --- Get training parameters from config ---
     total_timesteps_trial = hpt_config.get('total_timesteps_trial', 20000)
+    eval_freq = hpt_config.get('eval_freq', 5000)
+    learning_starts = hpt_config.get('learning_starts', 2500)
+    buffer_size = hpt_config.get('buffer_size', 1_000_000)
+    early_stopping_patience = hpt_config.get('early_stopping_patience', 5)
+    early_stopping_threshold = hpt_config.get('early_stopping_threshold', 0.01)
+    autotune_alpha = hpt_config.get('autotune_alpha', True)
 
     logging.info(f"--- Starting Trial {trial.number} ---")
     
@@ -46,6 +51,12 @@ def objective(trial, config, search_space, preprocessed_data):
         batch_size=batch_size,
         tau=tau,
         total_timesteps=total_timesteps_trial,
+        eval_freq=eval_freq,
+        learning_starts=learning_starts,
+        buffer_size=buffer_size,
+        early_stopping_patience=early_stopping_patience,
+        early_stopping_threshold=early_stopping_threshold,
+        autotune_alpha=autotune_alpha,
         save_model=False,
         optuna_trial=trial,
         preprocessed_data=preprocessed_data
@@ -55,24 +66,16 @@ def objective(trial, config, search_space, preprocessed_data):
     
     return validation_reward
 
-def main(n_jobs_override=None):
+def main():
     """
     Main function to run the hyperparameter search using Optuna.
-    Accepts an override for n_jobs for programmatic execution.
+    Now loads data once, supports Pruning, and is ready for Parallel execution.
     """
     logging.info("--- Starting Hyperparameter Search with Optuna (with Pruning & Parallel Support) ---")
     config = load_config()
     hpt_config = config.get('sac_hyperparameters', {})
     search_space = hpt_config.get('search_space', {})
     n_trials = hpt_config.get('n_trials', 50)
-    
-    # Determine n_jobs: override > config > default
-    if n_jobs_override is not None:
-        n_jobs = n_jobs_override
-    else:
-        n_jobs = hpt_config.get('n_jobs', 1)
-    
-    logging.info(f"Executing with n_jobs = {n_jobs}")
 
     # --- Pre-load and process data ONCE ---
     logging.info("Preprocessing data once before starting trials...")
@@ -110,41 +113,11 @@ def main(n_jobs_override=None):
     
     start_time = time.time()
 
-    # --- Progress Callback ---
-    def progress_callback(study, trial):
-        """
-        Callback to print progress after each trial.
-        This is used to update the GUI when running on a VM.
-        """
-        # We start at 50% and go to 80% for the HPT phase
-        base_progress = 50
-        hpt_progress_range = 30  # (80% - 50%)
-        
-        # Calculate completion ratio for HPT
-        completed_trials = trial.number + 1
-        total_trials = n_trials
-        
-        # Calculate the progress within the HPT phase's allocated range
-        current_hpt_progress = (completed_trials / total_trials) * hpt_progress_range
-        
-        # Total progress is the base + current HPT progress
-        total_progress = base_progress + current_hpt_progress
-        
-        # Print in a format that the orchestrator can parse
-        print(f"PROGRESS: {int(total_progress)}%")
-        # Flush the output to ensure it's sent immediately
-        sys.stdout.flush()
-
     # The objective function now needs the config, search_space, and data passed to it
     objective_with_args = lambda trial: objective(trial, config, search_space, preprocessed_data)
 
-    # Start the optimization with the callback
-    study.optimize(
-        objective_with_args, 
-        n_trials=n_trials, 
-        n_jobs=n_jobs,
-        callbacks=[progress_callback]
-    )
+    # Start the optimization
+    study.optimize(objective_with_args, n_trials=n_trials, n_jobs=1) # n_jobs=1, parallelism is handled by running multiple scripts
 
     # --- Log the results ---
     total_duration = time.time() - start_time
@@ -174,25 +147,6 @@ def main(n_jobs_override=None):
     logging.info("\nTo run in parallel, execute this script in multiple terminals simultaneously.")
 
 if __name__ == "__main__":
-    # Force 'spawn' start method for multiprocessing to ensure stability on Linux/macOS,
-    # especially when using libraries like PyTorch that are not fork-safe.
-    try:
-        mp.set_start_method('spawn', force=True)
-        logging.info("Successfully set multiprocessing start method to 'spawn'.")
-    except RuntimeError:
-        # This can happen if the context is already set. We'll log a warning.
-        logging.warning("Multiprocessing context already set. Assuming it's configured correctly.")
-
     # Setup basic logging for direct script execution
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    
-    parser = argparse.ArgumentParser(description="Run Optuna Hyperparameter Search for SAC.")
-    parser.add_argument(
-        '--n_jobs', 
-        type=int, 
-        default=None, 
-        help='Number of parallel jobs for Optuna. Overrides config file setting.'
-    )
-    args = parser.parse_args()
-    
-    main(n_jobs_override=args.n_jobs)
+    main()
