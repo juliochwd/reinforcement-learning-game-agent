@@ -52,6 +52,12 @@ class DataScraper:
             latest_record = response_records[0]
             df = pd.DataFrame([latest_record])
             df.rename(columns={'issueNumber': 'Period', 'number': 'Number'}, inplace=True)
+            
+            # Filter untuk memastikan hanya game '10001' yang diproses
+            if '10001' not in str(df['Period'].iloc[0]):
+                logging.info(f"Mendapatkan hasil dari game yang tidak relevan (Periode: {df['Period'].iloc[0]}). Mengabaikan.")
+                return None
+
             df['Number'] = pd.to_numeric(df['Number'])
             logging.info(f"Berhasil scrape hasil terbaru: Periode {df['Period'].iloc[0]}, Nomor {df['Number'].iloc[0]}")
             return df[['Period', 'Number']]
@@ -257,6 +263,18 @@ class DataScraper:
 
             df = pd.DataFrame(all_records)
             df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
+            
+            # Filter utama untuk memastikan hanya data dari game '10001' yang diproses
+            df['Period'] = df['Period'].astype(str)
+            initial_count = len(df)
+            df = df[df['Period'].str.contains('10001', na=False)]
+            filtered_count = len(df)
+            logging.info(f"Memfilter data untuk game '10001'. {initial_count - filtered_count} dari {initial_count} record dihapus.")
+
+            if df.empty:
+                logging.warning("Tidak ada data untuk game '10001' yang ditemukan setelah pemfilteran.")
+                return None
+
             df['Number'] = pd.to_numeric(df['Number'])
             df['Big/Small'] = np.where(df['Number'] >= 5, 'Big', 'Small')
             final_df = df[['Period', 'Number', 'Big/Small', 'Color', 'Premium']].copy()
@@ -317,6 +335,12 @@ class DataScraper:
 
                 latest_df = pd.DataFrame(response_records)
                 latest_df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
+                
+                # Filter untuk memastikan hanya game '10001' yang diproses secara live
+                latest_df['Period'] = latest_df['Period'].astype(str)
+                if not latest_df['Period'].str.contains('10001').any():
+                    logging.info(f"Data live yang diterima bukan untuk game '10001'. Mengabaikan.")
+                    continue
                 
                 # Proses dan simpan data
                 try:
