@@ -84,7 +84,7 @@ ipython_config.py
 # pyenv
 .python-version
 
-# PEP 582; used by PDM, PEP 582 proposal
+# PEP 582; __pypackages__
 __pypackages__/
 
 # Celery stuff
@@ -105,7 +105,7 @@ venv.bak/
 
 # Spyder project settings
 .spyderproject
-.spyproject
+.spyderworkspace
 
 # Rope project settings
 .ropeproject
@@ -127,32 +127,37 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# VSCode settings
+# VSCode
 .vscode/
 
-# --- Project-specific ignores ---
-# Ignore configuration file with credentials
-config.yaml
-
-# Ignore data files
-data/
-*.csv
-*.xlsx
-
-# Ignore model files
-models/
-*.pth
-*.joblib
-
-# Ignore log files
+# Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Ignore MLflow tracking data
-mlruns/
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Ignore sensitive files and backups
-ingat.txt
-ingat.txt.bak
-*.bak
+# Project-specific
+/models/*.joblib
+/models/*.pth
+/models/*.json
+/data/*.csv
+/data/*.log
+hpt_study.db
+*.db-journal

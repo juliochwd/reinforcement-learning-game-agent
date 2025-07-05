@@ -253,7 +253,7 @@ class DataScraper:
             final_df['Period'] = final_df['Period'].astype(str)
             final_df = final_df.sort_values(by='Period', ascending=True).drop_duplicates(subset='Period', keep='last')
 
-            output_csv_path = self.config['data_path']
+            output_csv_path = self.config['project_setup']['data_path']
             try:
                 existing_df = pd.read_csv(output_csv_path)
                 existing_df['Period'] = existing_df['Period'].astype(str)

@@ -66,6 +66,7 @@ class BrowserManager:
             logging.info("Login terkirim. Menunggu navigasi...")
             time.sleep(self.timers.get('post_login_sleep', 3))
             handle_popups(self.driver, self.xpaths, self.timers)
+            time.sleep(self.timers.get('post_action_sleep', 1)) # Extra delay after login
             return True
         except (TimeoutException, NoSuchElementException) as e:
             logging.error(f"Elemen login tidak ditemukan atau waktu tunggu habis: {e}", exc_info=True)
@@ -87,6 +88,9 @@ class BrowserManager:
             self.driver.execute_script("arguments[0].click();", win_go_menu)
             time.sleep(self.timers.get('post_action_sleep', 1))
             
+            # Extra delay before clicking the 1min button
+            time.sleep(self.timers.get('post_action_sleep', 1))
+
             win_go_1min_button = WebDriverWait(self.driver, self.timeouts.get('element_wait', 20)).until(EC.element_to_be_clickable((btn_by, btn_val)))
             self.driver.execute_script("arguments[0].click();", win_go_1min_button)
             

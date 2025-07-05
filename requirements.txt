@@ -1,31 +1,11 @@
-attr
-colorama
-cryptography
-docutils
-filelock
-gymnasium
-ipython
-ipywidgets
-joblib
-keyring
-matplotlib
-numpy
-optuna
-pandas
-Pillow
-protobuf
-pyOpenSSL
-pytest
-PyYAML
-redis
-scikit_learn
-selenium
-selenium_wire
-setuptools
-Sphinx
-statsmodels
-torch
-urllib3_secure_extra
-zstandard
-customtkinter
-Pillow
+# Essential dependencies for the Game Agent Data Scraper
+
+# For web automation and scraping
+selenium==4.15.0
+webdriver-manager==4.0.1
+
+# For data handling
+pandas==2.1.3
+
+# For reading the configuration file
+PyYAML==6.0.1
