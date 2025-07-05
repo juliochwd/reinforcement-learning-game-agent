@@ -290,3 +290,75 @@ class DataScraper:
                     self.driver.get(game_page_url)
             except Exception as nav_e:
                 logging.warning(f"Could not navigate back to the main game page: {nav_e}")
+
+    def start_live_scraping(self, stop_event):
+        """
+        Memulai proses scraping data secara live, dipicu oleh pembaruan API,
+        dan berhenti ketika event berhenti diatur.
+        """
+        logging.info("--- Memulai Live Scraping Berbasis API Event ---")
+        output_csv_path = self.config['project_setup']['data_path']
+        
+        while not stop_event.is_set():
+            logging.info(f"Menunggu pembaruan API berikutnya dari '{self.api_endpoint}'...")
+            try:
+                # Hapus request sebelumnya untuk memastikan kita menangkap yang baru
+                del self.driver.requests
+                
+                # Tunggu permintaan dengan timeout untuk memungkinkan pemeriksaan stop_event
+                request = self.driver.wait_for_request(self.api_endpoint, timeout=5)
+                
+                logging.info("Permintaan API terdeteksi. Memproses data...")
+                response_records = process_api_response(request)
+                
+                if not response_records:
+                    logging.warning("API terdeteksi tetapi tidak ada catatan yang ditemukan.")
+                    continue
+
+                latest_df = pd.DataFrame(response_records)
+                latest_df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
+                
+                # Proses dan simpan data
+                try:
+                    # Baca data yang ada
+                    try:
+                        existing_df = pd.read_csv(output_csv_path)
+                        existing_df['Period'] = existing_df['Period'].astype(str)
+                    except FileNotFoundError:
+                        logging.info(f"File data '{output_csv_path}' tidak ditemukan. Membuat file baru.")
+                        existing_df = pd.DataFrame(columns=['Period', 'Number', 'Big/Small', 'Color', 'Premium'])
+
+                    latest_df['Period'] = latest_df['Period'].astype(str)
+                    latest_df['Number'] = pd.to_numeric(latest_df['Number'])
+                    latest_df['Big/Small'] = np.where(latest_df['Number'] >= 5, 'Big', 'Small')
+
+                    combined_df = pd.concat([existing_df, latest_df], ignore_index=True)
+                    
+                    final_cols = ['Period', 'Number', 'Big/Small', 'Color', 'Premium']
+                    for col in final_cols:
+                        if col not in combined_df.columns:
+                            combined_df[col] = pd.NA
+                    combined_df = combined_df[final_cols]
+
+                    combined_df.drop_duplicates(subset='Period', keep='last', inplace=True)
+                    combined_df.sort_values(by='Period', ascending=True, inplace=True)
+                    
+                    if not combined_df.equals(existing_df):
+                        combined_df.to_csv(output_csv_path, index=False)
+                        logging.info(f"Data baru disimpan. Total record sekarang: {len(combined_df)}")
+                    else:
+                        logging.info("Tidak ada data baru yang ditemukan (duplikat).")
+
+                except Exception as e:
+                    logging.error(f"Gagal memproses atau menyimpan data live: {e}", exc_info=True)
+
+            except TimeoutException:
+                # Timeout diharapkan, ini memungkinkan loop untuk memeriksa stop_event
+                logging.debug("Tidak ada permintaan API dalam interval waktu. Melanjutkan pengecekan...")
+                continue
+            except Exception as e:
+                if not stop_event.is_set():
+                    logging.error(f"Terjadi kesalahan tak terduga dalam loop live scraping: {e}", exc_info=True)
+                time.sleep(5) # Tunggu sebentar sebelum mencoba lagi
+
+        logging.info("--- Live Scraping Dihentikan ---")

@@ -149,6 +149,10 @@ class App(ctk.CTk):
                     self.pages["PageData"].scrape_button.configure(state=tk.DISABLED)
                 elif msg_type == "bulk_scrape_finished":
                     self.pages["PageData"].scrape_button.configure(state=tk.NORMAL)
+                elif msg_type == "live_scrape_started":
+                    self.pages["PageData"].toggle_live_scrape_button_state(is_running=True)
+                elif msg_type == "live_scrape_finished":
+                    self.pages["PageData"].toggle_live_scrape_button_state(is_running=False)
                 elif msg_type == "log":
                     if self.active_log_widget and self.active_log_widget.winfo_exists():
                         self.active_log_widget.insert(tk.END, msg.get("record", "") + '\n')
@@ -184,10 +188,21 @@ class PageData(PageBase):
         self.password_entry = ctk.CTkEntry(creds_frame, show="*", font=self.controller.fonts["BODY"], height=35)
         self.password_entry.grid(row=1, column=1, sticky="ew", padx=20, pady=15)
         
-        self.scrape_button = ctk.CTkButton(self, text="Scrape Latest Data", 
+        action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_buttons_frame.grid(row=2, column=0, sticky="ew", pady=(20, 0))
+        action_buttons_frame.grid_columnconfigure(0, weight=1)
+        action_buttons_frame.grid_columnconfigure(1, weight=1)
+
+        self.scrape_button = ctk.CTkButton(action_buttons_frame, text="Scrape Latest Data", 
                                            font=self.controller.fonts["BODY"],
                                            command=self.start_scraping, height=45, corner_radius=8)
-        self.scrape_button.grid(row=2, column=0, sticky="ew", pady=(20, 0))
+        self.scrape_button.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+
+        self.live_scrape_button = ctk.CTkButton(action_buttons_frame, text="Start Live Scrape",
+                                                font=self.controller.fonts["BODY"],
+                                                command=self.toggle_live_scrape, height=45, corner_radius=8)
+        self.live_scrape_button.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        self.is_live_scraping = False
         
         # Combined progress and log area
         status_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -235,3 +250,30 @@ class PageData(PageBase):
             eta_label=self.eta_label, log_widget=self.log_widget,
             phone=phone, password=password
         )
+
+    def toggle_live_scrape(self):
+        phone = self.phone_entry.get()
+        password = self.password_entry.get()
+        if not phone or not password:
+            logging.error("Phone number and password cannot be empty for live scraping.")
+            return
+            
+        self.active_log_widget = self.log_widget
+        if not self.is_live_scraping:
+            self.controller.task_orchestrator.start_live_scrape(
+                button=self.live_scrape_button, progress_bar=None,
+                eta_label=None, log_widget=self.log_widget,
+                phone=phone, password=password
+            )
+        else:
+            self.controller.task_orchestrator.stop_live_scrape(button=self.live_scrape_button)
+
+    def toggle_live_scrape_button_state(self, is_running):
+        self.is_live_scraping = is_running
+        if is_running:
+            self.live_scrape_button.configure(text="Stop Live Scrape", fg_color="#D32F2F", hover_color="#B71C1C")
+            self.scrape_button.configure(state=tk.DISABLED) # Disable bulk scrape during live
+        else:
+            self.live_scrape_button.configure(text="Start Live Scrape", fg_color=("#3a7ebf", "#1f538d"), hover_color=("#325882", "#14375e"))
+            self.scrape_button.configure(state=tk.NORMAL)
+        self.live_scrape_button.configure(state=tk.NORMAL)

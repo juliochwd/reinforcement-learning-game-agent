@@ -3,6 +3,7 @@ import time
 import os
 import queue
 import pandas as pd
+import threading
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -22,6 +23,7 @@ class RealtimeAgent:
         self.phone = phone
         self.password = password
         self.running = False
+        self.stop_event = threading.Event()
         self.web_agent_config = self.config.get('web_agent', {})
         self.timeouts = self.web_agent_config.get('timeouts', {})
         self.timers = self.web_agent_config.get('timers', {})
@@ -83,3 +85,35 @@ class RealtimeAgent:
             self.gui_queue.put({"type": "bulk_scrape_finished"})
             logging.info("--- Tugas Scraping Data Mandiri Selesai ---")
 
+    def run_live_scrape(self):
+        """Membungkus logika untuk menjalankan tugas live scraping."""
+        logging.info("--- Memulai Tugas Live Scraping ---")
+        driver = None
+        try:
+            driver = self.browser_manager.initialize_driver()
+            if not driver:
+                logging.error("Gagal menginisialisasi WebDriver untuk live scraping.")
+                return
+
+            self.data_scraper = DataScraper(driver, self.config)
+            
+            if not self.browser_manager.login(phone=self.phone, password=self.password) or not self.browser_manager.navigate_to_game():
+                logging.error("Gagal login atau navigasi untuk live scraping.")
+                return
+
+            self.gui_queue.put({"type": "live_scrape_started"})
+            # Mulai loop scraping di DataScraper
+            self.data_scraper.start_live_scraping(self.stop_event)
+
+        except Exception as e:
+            logging.critical(f"Error selama live scraping: {e}", exc_info=True)
+        finally:
+            if driver:
+                self.browser_manager.close()
+            self.gui_queue.put({"type": "live_scrape_finished"})
+            logging.info("--- Tugas Live Scraping Selesai ---")
+
+    def stop(self):
+        """Mengatur event untuk menghentikan semua loop yang sedang berjalan."""
+        logging.info("Menerima sinyal berhenti. Menghentikan agen...")
+        self.stop_event.set()
