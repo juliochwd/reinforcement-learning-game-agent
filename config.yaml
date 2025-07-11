@@ -103,7 +103,7 @@ web_agent:
   initial_balance: 2000000
   bet_unit_divisor: 1000 # e.g., 1000 units = 1000 currency
   scraping:
-    max_pages: 1000
+    max_pages: 100
     zoom_level: "80%"
   timeouts:
     page_load: 60

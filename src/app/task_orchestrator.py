@@ -49,7 +49,8 @@ class TaskOrchestrator:
             except Exception as e:
                 logging.critical(f"UNHANDLED EXCEPTION IN THREAD for {target_func.__name__}: {e}", exc_info=True)
             finally:
-                self.gui_queue.put({"type": "task_finished", "button": button})
+                if self.gui_queue is not None:
+                    self.gui_queue.put({"type": "task_finished", "button": button})
 
         threading.Thread(target=thread_wrapper, daemon=True).start()
 
@@ -82,7 +83,7 @@ class TaskOrchestrator:
             # GUI akan di-update melalui pesan 'live_scrape_finished' dari thread
         else:
             logging.warning("Tidak ada tugas live scrape yang sedang berjalan untuk dihentikan.")
-            if button:
+            if button and self.gui_queue is not None:
                  self.gui_queue.put({"type": "task_finished", "button": button})
 
     def start_task(self, task_name, button, progress_bar, eta_label, log_widget):
@@ -90,5 +91,5 @@ class TaskOrchestrator:
         Placeholder for task execution. All training/evaluation tasks have been removed.
         """
         logging.error(f"Task '{task_name}' is no longer available.")
-        if button:
+        if button and self.gui_queue is not None:
             self.gui_queue.put({"type": "task_finished", "button": button})

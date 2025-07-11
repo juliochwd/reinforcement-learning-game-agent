@@ -30,10 +30,12 @@ class DataScraper:
             by_str = selector_config.get('by', 'XPATH').upper()
             by = getattr(By, by_str)
             value = selector_config.get('value')
+            if by is None or value is None:
+                raise KeyError
             return by, value
         except KeyError:
             logging.error(f"Selector untuk '{category}.{name}' tidak ditemukan di config.yaml.")
-            return None, None
+            return (By.XPATH, "//invalid-xpath")  # Return a safe default
 
     def scrape_latest_result(self):
         """
@@ -72,16 +74,22 @@ class DataScraper:
         """Scrape saldo akun saat ini dari UI, dengan opsi untuk me-refresh."""
         try:
             cont_by, cont_val = self._get_selector('game_interface', 'balance_container')
+            if not cont_by or not cont_val:
+                raise NoSuchElementException("Selector for balance_container is invalid.")
             balance_container = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((cont_by, cont_val)))
 
             if refresh:
                 logging.info("Me-refresh saldo...")
                 ref_by, ref_val = self._get_selector('game_interface', 'balance_refresh_button')
+                if not ref_by or not ref_val:
+                    raise NoSuchElementException("Selector for balance_refresh_button is invalid.")
                 refresh_button = WebDriverWait(balance_container, 10).until(EC.element_to_be_clickable((ref_by, ref_val)))
                 self.driver.execute_script("arguments[0].click();", refresh_button)
                 time.sleep(self.timers.get('post_action_sleep', 1))
 
             val_by, val_val = self._get_selector('game_interface', 'balance_value')
+            if not val_by or not val_val:
+                raise NoSuchElementException("Selector for balance_value is invalid.")
             balance_element = balance_container.find_element(val_by, val_val)
             balance_text = balance_element.text.replace('Rp', '').replace(',', '').strip()
             return float(balance_text)
@@ -99,6 +107,8 @@ class DataScraper:
         """Scrape nomor periode untuk game yang akan datang."""
         try:
             by, val = self._get_selector('game_interface', 'period_display')
+            if not by or not val:
+                raise NoSuchElementException("Selector for period_display is invalid.")
             period_element = self.driver.find_element(by, val)
             return period_element.text.strip()
         except NoSuchElementException:
@@ -112,6 +122,8 @@ class DataScraper:
         """Scrape nilai timer saat ini dari UI."""
         try:
             by, val = self._get_selector('game_interface', 'timer_display')
+            if not by or not val:
+                raise NoSuchElementException("Selector for timer_display is invalid.")
             timer_element = self.driver.find_element(by, val)
             return timer_element.text.strip()
         except NoSuchElementException:
@@ -279,20 +291,29 @@ class DataScraper:
             df['Big/Small'] = np.where(df['Number'] >= 5, 'Big', 'Small')
             final_df = df[['Period', 'Number', 'Big/Small', 'Color', 'Premium']].copy()
             final_df['Period'] = final_df['Period'].astype(str)
-            final_df = final_df.sort_values(by='Period', ascending=True).drop_duplicates(subset='Period', keep='last')
+            if isinstance(final_df, pd.DataFrame):
+                final_df = final_df.sort_values(by='Period', ascending=True).drop_duplicates(subset='Period', keep='last')
 
             output_csv_path = self.config['project_setup']['data_path']
             try:
                 existing_df = pd.read_csv(output_csv_path)
                 existing_df['Period'] = existing_df['Period'].astype(str)
+                if not isinstance(existing_df, pd.DataFrame):
+                    existing_df = pd.DataFrame(existing_df)
+                if not isinstance(final_df, pd.DataFrame):
+                    final_df = pd.DataFrame(final_df)
                 combined_df = pd.concat([existing_df, final_df], ignore_index=True)
             except FileNotFoundError:
                 logging.info(f"'{output_csv_path}' not found. A new file will be created.")
-                combined_df = final_df
+                if not isinstance(final_df, pd.DataFrame):
+                    combined_df = pd.DataFrame(final_df)
+                else:
+                    combined_df = final_df
             
-            combined_df.drop_duplicates(subset='Period', keep='last', inplace=True)
-            combined_df.sort_values(by='Period', ascending=True, inplace=True)
-            combined_df.to_csv(output_csv_path, index=False)
+            if isinstance(combined_df, pd.DataFrame):
+                combined_df = combined_df.drop_duplicates(subset='Period', keep='last')
+                combined_df = combined_df.sort_values(by='Period', ascending=True)
+                combined_df.to_csv(output_csv_path, index=False)
             logging.info(f"SUCCESS: All {len(combined_df)} unique records have been saved to '{output_csv_path}'")
             return combined_df
 
@@ -350,12 +371,16 @@ class DataScraper:
                         existing_df['Period'] = existing_df['Period'].astype(str)
                     except FileNotFoundError:
                         logging.info(f"File data '{output_csv_path}' tidak ditemukan. Membuat file baru.")
-                        existing_df = pd.DataFrame(columns=['Period', 'Number', 'Big/Small', 'Color', 'Premium'])
+                        existing_df = pd.DataFrame({col: pd.Series(dtype='object') for col in ["Period", "Number", "Big/Small", "Color", "Premium"]})
 
                     latest_df['Period'] = latest_df['Period'].astype(str)
                     latest_df['Number'] = pd.to_numeric(latest_df['Number'])
                     latest_df['Big/Small'] = np.where(latest_df['Number'] >= 5, 'Big', 'Small')
 
+                    if not isinstance(existing_df, pd.DataFrame):
+                        existing_df = pd.DataFrame(existing_df)
+                    if not isinstance(latest_df, pd.DataFrame):
+                        latest_df = pd.DataFrame(latest_df)
                     combined_df = pd.concat([existing_df, latest_df], ignore_index=True)
                     
                     final_cols = ['Period', 'Number', 'Big/Small', 'Color', 'Premium']
@@ -364,14 +389,13 @@ class DataScraper:
                             combined_df[col] = pd.NA
                     combined_df = combined_df[final_cols]
 
-                    combined_df.drop_duplicates(subset='Period', keep='last', inplace=True)
-                    combined_df.sort_values(by='Period', ascending=True, inplace=True)
-                    
-                    if not combined_df.equals(existing_df):
-                        combined_df.to_csv(output_csv_path, index=False)
-                        logging.info(f"Data baru disimpan. Total record sekarang: {len(combined_df)}")
+                    if isinstance(combined_df, pd.DataFrame):
+                        combined_df = combined_df.drop_duplicates(subset='Period', keep='last')
+                        combined_df = combined_df.sort_values(by='Period', ascending=True)
+                        if not combined_df.equals(existing_df):
+                            combined_df.to_csv(output_csv_path, index=False)
                     else:
-                        logging.info("Tidak ada data baru yang ditemukan (duplikat).")
+                        logging.warning("Combined DataFrame is not a DataFrame, skipping save.")
 
                 except Exception as e:
                     logging.error(f"Gagal memproses atau menyimpan data live: {e}", exc_info=True)
