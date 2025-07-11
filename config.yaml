@@ -108,7 +108,7 @@ web_agent:
   timeouts:
     page_load: 60
     element_wait: 30
-    api_wait: 15
+    api_wait: 600
     recovery_threshold_seconds: 75
     bet_placement_buffer_seconds: 7
   timers:
