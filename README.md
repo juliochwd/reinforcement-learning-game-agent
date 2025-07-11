@@ -8,19 +8,21 @@ The application is built with Python and utilizes the Selenium library for web a
 
 ## Features
 
-- **GUI-Based Operation**: A simple and intuitive graphical interface built with Tkinter allows for easy control over the data scraping process.
-- **Automated Web Scraping**: The agent uses Selenium to automate browser interactions, including login and navigation to the game's data sections.
-- **Real-Time Progress Monitoring**: The GUI provides real-time feedback on the scraping process, including progress bars, ETA estimates, and detailed logging.
-- **Configuration-Driven**: All settings, including URLs, credentials, and scraping parameters, are managed through a central `config.yaml` file, making it easy to customize the agent's behavior.
-- **Robust and Reliable**: The agent is designed to handle common web scraping challenges, with built-in error handling and recovery mechanisms.
+- **Modern GUI**: Built with CustomTkinter for a modern, dark-themed interface
+- **Automated Web Scraping**: Uses Selenium with Selenium Wire for advanced web automation
+- **Real-Time Progress Monitoring**: Live progress bars, ETA estimates, and detailed logging
+- **Configuration-Driven**: All settings managed through `config.yaml`
+- **Robust Error Handling**: Built-in error recovery and retry mechanisms
+- **Data Processing**: Advanced data handling with pandas and numpy
+- **Secure Credential Management**: No hardcoded credentials
 
 ## Getting Started
 
 ### Prerequisites
 
 - Python 3.8 or higher
-- A modern web browser (Chrome is recommended)
-- ChromeDriver, with its version matching your installed Chrome version
+- Chrome browser (recommended)
+- ChromeDriver (auto-managed by webdriver-manager)
 
 ### Installation
 
@@ -43,45 +45,33 @@ The application is built with Python and utilizes the Selenium library for web a
 
 ### Configuration
 
-Before running the application, you need to configure it by editing the `config.yaml` file:
+Before running the application, configure `config.yaml`:
 
 1. **Web Agent Settings**:
-   - `login_url`: The URL of the game's login page.
-   - `api_endpoint`: The API endpoint for data collection.
-   - `initial_balance`: The initial balance for the game account.
+   - `login_url`: Game login page URL
+   - `api_endpoint`: Data collection API endpoint
+   - `initial_balance`: Initial game account balance
 
-2. **Credentials**:
-   - The application will prompt for your phone number and password when you start the scraping process. These are not stored in the configuration file for security reasons.
+2. **Scraping Parameters**:
+   - `max_pages`: Maximum pages to scrape
+   - `zoom_level`: Browser zoom level
+   - `timeouts`: Various timeout settings
 
-3. **Scraping Parameters**:
-   - `max_pages`: The maximum number of pages to scrape.
-   - `zoom_level`: The browser zoom level to use during scraping.
+3. **UI Configuration**:
+   - Window size and appearance
+   - Progress indicators
+   - Logging settings
 
 ### Running the Application
-
-To start the application, run the `main.py` script from the project's root directory:
 
 ```bash
 python main.py
 ```
 
-This will launch the GUI, where you can start the data scraping process by clicking the "Start Scraping" button. The application will then prompt you for your login credentials and begin the scraping process, with all progress and logs displayed in the main window.
+This launches the modern GUI where you can:
+- Start data scraping with "Start Scraping" button
+- Monitor real-time progress
+- View detailed logs
+- Manage scraping parameters
 
 ## Project Structure
-
-- **`main.py`**: The entry point for the application.
-- **`config.yaml`**: The central configuration file for all settings.
-- **`src/`**: The main source code directory.
-  - **`app/`**: Contains the GUI and task orchestration logic.
-    - **`gui.py`**: Defines the main application window and its components.
-    - **`task_orchestrator.py`**: Manages background tasks to keep the GUI responsive.
-  - **`rl_agent/`**: Contains the core logic for the web scraping agent.
-    - **`realtime_agent.py`**: The main class for the scraping agent.
-    - **`browser_manager.py`**: Handles browser initialization, login, and navigation.
-    - **`data_scraper.py`**: Implements the data scraping logic.
-- **`data/`**: The default directory for storing scraped data.
-- **`requirements.txt`**: A list of all Python dependencies for the project.
-
-## Contributing
-
-Contributions are welcome! If you have any suggestions or improvements, please feel free to open an issue or submit a pull request.
