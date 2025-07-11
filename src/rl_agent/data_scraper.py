@@ -193,13 +193,30 @@ class DataScraper:
                 
                 # Masukkan nomor telepon dan tunggu hingga nilainya benar-benar diatur
                 phone_input = self.driver.find_element(By.NAME, 'userNumber')
+                phone_input.clear()
                 phone_input.send_keys(phone)
                 WebDriverWait(self.driver, 10).until(EC.text_to_be_present_in_element_value((By.NAME, 'userNumber'), phone))
+                # Validasi manual jika perlu
+                for _ in range(5):
+                    if phone_input.get_attribute('value') == phone:
+                        break
+                    time.sleep(0.2)
+                else:
+                    logging.error('Phone input value did not match after retries.')
+                    return None
                 
                 # Masukkan kata sandi dan tunggu hingga nilainya benar-benar diatur
                 password_input = self.driver.find_element(By.XPATH, '//input[@placeholder="Password"]')
+                password_input.clear()
                 password_input.send_keys(password)
                 WebDriverWait(self.driver, 10).until(EC.text_to_be_present_in_element_value((By.XPATH, '//input[@placeholder="Password"]'), password))
+                for _ in range(5):
+                    if password_input.get_attribute('value') == password:
+                        break
+                    time.sleep(0.2)
+                else:
+                    logging.error('Password input value did not match after retries.')
+                    return None
 
                 # Klik tombol login setelah input diisi
                 login_button = self.driver.find_element(By.XPATH, '//button[text()="Log in"]')
