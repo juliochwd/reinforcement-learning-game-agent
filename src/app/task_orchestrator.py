@@ -188,6 +188,8 @@ class TaskOrchestrator:
             self.ensemble_trainer.show_ensemble_analysis()
         def run_hyperparameter_search():
             self.start_hyperparameter_search(button, progress_bar, eta_label, log_widget)
+        def run_retrain_on_all_data():
+            self.ensemble_trainer.retrain_on_all_data()
         if task_name == "train_ensemble":
             self.run_in_thread(run_train_ensemble, button, progress_bar, eta_label, log_widget)
         elif task_name == "evaluate_ensemble":
@@ -198,6 +200,8 @@ class TaskOrchestrator:
             self.run_in_thread(run_feature_importance, button, progress_bar, eta_label, log_widget)
         elif task_name == "ensemble_analysis":
             self.run_in_thread(run_ensemble_analysis, button, progress_bar, eta_label, log_widget)
+        elif task_name == "retrain_on_all_data":
+            self.run_in_thread(run_retrain_on_all_data, button, progress_bar, eta_label, log_widget)
         elif task_name == "hyperparameter_search":
             run_hyperparameter_search()
         else:

@@ -310,6 +310,12 @@ class PageData(PageBase):
         self.hyperparam_search_button_tooltip = ctk.CTkLabel(self, text="Cari kombinasi parameter terbaik untuk model online learning (Optuna)", font=self.controller.fonts["SMALL"], fg_color="#222222", text_color="#ffffff", corner_radius=6)
         self.hyperparam_search_button.bind("<Enter>", lambda e: self._show_tooltip(self.hyperparam_search_button_tooltip, self.hyperparam_search_button))
         self.hyperparam_search_button.bind("<Leave>", lambda e: self._hide_tooltip(self.hyperparam_search_button_tooltip))
+        # Tambahkan tombol retrain final model pada seluruh data
+        self.retrain_all_button = ctk.CTkButton(action_buttons_frame, text="Retrain Final Model (All Data)", command=self.retrain_on_all_data_button, font=self.controller.fonts["BODY"], height=45, corner_radius=12, fg_color="#3A7EBF", hover_color="#2563A6", text_color="#ffffff")
+        self.retrain_all_button.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        self.retrain_all_button_tooltip = ctk.CTkLabel(self, text="Latih ulang model final pada seluruh data (train+val) dengan best params. Untuk deployment.", font=self.controller.fonts["SMALL"], fg_color="#222222", text_color="#ffffff", corner_radius=6)
+        self.retrain_all_button.bind("<Enter>", lambda e: self._show_tooltip(self.retrain_all_button_tooltip, self.retrain_all_button))
+        self.retrain_all_button.bind("<Leave>", lambda e: self._hide_tooltip(self.retrain_all_button_tooltip))
         # Combined progress and log area
         status_frame = ctk.CTkFrame(self, fg_color="transparent")
         status_frame.grid(row=3, column=0, sticky="nsew", pady=(20, 0))
@@ -515,6 +521,23 @@ class PageData(PageBase):
         tooltip.lift()
     def _hide_tooltip(self, tooltip):
         tooltip.place_forget()
+
+    def retrain_on_all_data_button(self):
+        self.active_log_widget = self.log_widget
+        try:
+            from src.utils.logging_utils import log_audit
+            log_audit("RetrainAllData", "User triggered retrain on all data.")
+            self.controller.task_orchestrator.start_task(
+                task_name="retrain_on_all_data",
+                button=self.retrain_all_button,
+                progress_bar=self.progress_bar,
+                eta_label=self.eta_label,
+                log_widget=self.log_widget
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Exception in retrain_on_all_data_button: {e}", exc_info=True)
+            self.controller.show_error_dialog("Retrain Error", str(e))
 
 class PageSettings(PageBase):
     def __init__(self, parent, controller):

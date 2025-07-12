@@ -256,6 +256,52 @@ class SupervisedEnsembleTrainer:
         with open(MODEL_PATH + '.meta.json', 'w') as f:
             json.dump(meta, f)
 
+    def retrain_on_all_data(self):
+        """
+        Retrain final model pada seluruh data (train+val), best practice untuk deployment.
+        Tidak ada data masa depan, tetap anti-leakage (kronologis).
+        """
+        import importlib.metadata
+        river_version = importlib.metadata.version('river')
+        self.log_environment()
+        df = self.load_data()
+        # Gunakan seluruh data untuk training (tanpa split)
+        full_feat = engineer_features_number_full_anti_leakage(df)
+        X_cols = [c for c in full_feat.columns if c != 'Number']
+        logging.info(f"[RETRAIN] X_cols (fitur input, hanya lag Number): {X_cols}")
+        best_params = self.load_best_params()
+        if best_params:
+            logging.info(f"[RETRAIN] Menggunakan best params hasil Optuna: {best_params}")
+            self.model = tree.HoeffdingTreeClassifier(**best_params)
+        else:
+            self.model = tree.HoeffdingTreeClassifier(max_depth=7)
+        n = 0
+        for idx, row in full_feat.iterrows():
+            x = {col: row[col] for col in X_cols}
+            y = int(row['Number'])
+            self.model.learn_one(x, y)
+            n += 1
+            if n % 1000 == 0:
+                logging.info(f"[RETRAIN] Trained on {n} samples...")
+        with open(MODEL_PATH, 'wb') as f:
+            pickle.dump(self.model, f)
+        self.is_trained = True
+        logging.info(f"[RETRAIN] Training selesai pada seluruh data. Model disimpan di {MODEL_PATH}")
+        # Simpan metadata training
+        meta = {
+            'params': best_params if best_params else {'max_depth': 7},
+            'datetime': datetime.datetime.now().isoformat(),
+            'optuna_version': optuna.__version__,
+            'river_version': river_version,
+            'python_version': sys.version,
+            'platform': platform.platform(),
+            'retrain_on_all_data': True
+        }
+        with open(MODEL_PATH + '.meta.json', 'w') as f:
+            json.dump(meta, f)
+        if self.gui_queue is not None:
+            self.gui_queue.put({'type': 'log', 'record': '[RETRAIN] Model berhasil dilatih ulang pada seluruh data dan disimpan.'})
+
     def get_train_accuracy(self, train, X_cols):
         metric = metrics.Accuracy()
         for idx, row in train.iterrows():
