@@ -9,9 +9,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# --- Late Imports (setelah path setup) ---
-from src.rl_agent.realtime_agent import RealtimeAgent
 from src.app.gui import ModernConsoleLogger, ModernProgressbarHandler
+from src.app.supervised_ensemble_trainer import SupervisedEnsembleTrainer
 
 class TaskOrchestrator:
     def __init__(self, config):
@@ -19,9 +18,17 @@ class TaskOrchestrator:
         self.gui_queue = None
         self.active_agent = None
         self.live_scrape_thread = None
+        self.ensemble_trainer = SupervisedEnsembleTrainer()
+        self.ensemble_trainer.gui_queue = None  # Akan di-set oleh set_gui_queue
+        self.watcher_started = False
+        self.gui_controller = None  # Tambahkan ini
+
+    def set_gui_controller(self, gui_controller):
+        self.gui_controller = gui_controller
 
     def set_gui_queue(self, gui_queue):
         self.gui_queue = gui_queue
+        self.ensemble_trainer.gui_queue = gui_queue
 
     def run_in_thread(self, target_func, button, progress_bar, eta_label, log_widget):
         if not self.gui_queue:
@@ -55,41 +62,145 @@ class TaskOrchestrator:
         threading.Thread(target=thread_wrapper, daemon=True).start()
 
     def start_bulk_scrape(self, button, progress_bar, eta_label, log_widget, phone=None, password=None):
-        """
-        Memulai tugas scraping data. Ini sekarang berjalan secara independen dari agen utama.
-        """
         logging.info("Mempersiapkan untuk tugas scraping data mandiri.")
-        scrape_agent = RealtimeAgent(self.config, self.gui_queue, phone=phone, password=password)
-        self.run_in_thread(scrape_agent.run_standalone_scrape, button, progress_bar, eta_label, log_widget)
+        def do_scrape():
+            try:
+                from src.rl_agent.browser_manager import BrowserManager
+                from src.rl_agent.data_scraper import DataScraper
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "progress_indeterminate_start"})
+                    self.gui_queue.put({"type": "log", "record": "[Scrape] Browser dibuka, memulai login..."})
+                browser_mgr = BrowserManager(self.config)
+                driver = browser_mgr.initialize_driver()
+                if not browser_mgr.login(phone, password):
+                    logging.error("Login gagal. Scraping dibatalkan.")
+                    if self.gui_queue:
+                        self.gui_queue.put({"type": "log", "record": "[Scrape] Login gagal. Scraping dibatalkan."})
+                        self.gui_queue.put({"type": "progress_indeterminate_stop"})
+                    browser_mgr.close()
+                    return
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": "[Scrape] Login berhasil, menavigasi ke game..."})
+                if not browser_mgr.navigate_to_game():
+                    logging.error("Navigasi ke game gagal. Scraping dibatalkan.")
+                    if self.gui_queue:
+                        self.gui_queue.put({"type": "log", "record": "[Scrape] Navigasi ke game gagal. Scraping dibatalkan."})
+                        self.gui_queue.put({"type": "progress_indeterminate_stop"})
+                    browser_mgr.close()
+                    return
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": "[Scrape] Navigasi berhasil, mulai scraping data..."})
+                scraper = DataScraper(driver, self.config)
+                scraper.execute_bulk_scrape()
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": "[Scrape] Scraping selesai."})
+                    self.gui_queue.put({"type": "progress_indeterminate_stop"})
+            except Exception as e:
+                logging.error(f"Scraping gagal: {e}", exc_info=True)
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": f"[Scrape] Scraping gagal: {e}"})
+                    self.gui_queue.put({"type": "progress_indeterminate_stop"})
+            finally:
+                try:
+                    browser_mgr.close()
+                except Exception:
+                    pass
+        self.run_in_thread(do_scrape, button, progress_bar, eta_label, log_widget)
 
-    def start_live_scrape(self, button, progress_bar, eta_label, log_widget, phone=None, password=None):
-        """Memulai tugas live scraping di thread terpisah."""
-        if self.active_agent:
-            logging.warning("Live scrape sudah berjalan.")
-            return
+    def start_live_scrape(self, button, progress_bar, eta_label, log_widget, phone=None, password=None, mode="both"):
+        import threading
+        from src.rl_agent.browser_manager import BrowserManager
+        from src.rl_agent.data_scraper import DataScraper
 
-        logging.info("Mempersiapkan untuk tugas live scraping.")
-        self.active_agent = RealtimeAgent(self.config, self.gui_queue, phone=phone, password=password)
-        
-        # Kita tidak memerlukan progress bar untuk tugas berkelanjutan seperti live scraping
-        self.run_in_thread(self.active_agent.run_live_scrape, button, None, None, log_widget)
+        # Stop event untuk live scraping API
+        if not hasattr(self, 'live_scrape_stop_event') or self.live_scrape_stop_event is None:
+            self.live_scrape_stop_event = threading.Event()
+        else:
+            self.live_scrape_stop_event.clear()
+
+        def live_scrape_api():
+            try:
+                browser_mgr = BrowserManager(self.config)
+                driver = browser_mgr.initialize_driver()
+                if not browser_mgr.login(phone, password):
+                    if self.gui_queue:
+                        self.gui_queue.put({"type": "log", "record": "[LiveScrape] Login gagal."})
+                    browser_mgr.close()
+                    return
+                if not browser_mgr.navigate_to_game():
+                    if self.gui_queue:
+                        self.gui_queue.put({"type": "log", "record": "[LiveScrape] Navigasi gagal."})
+                    browser_mgr.close()
+                    return
+                scraper = DataScraper(driver, self.config)
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": "[LiveScrape] Live scraping API dimulai."})
+                scraper.start_live_scraping(self.live_scrape_stop_event)
+            except Exception as e:
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": f"[LiveScrape] Error: {e}"})
+            finally:
+                try:
+                    browser_mgr.close()
+                except Exception:
+                    pass
+                if self.gui_queue:
+                    self.gui_queue.put({"type": "log", "record": "[LiveScrape] Live scraping API dihentikan."})
+
+        # Jalankan watcher CSV (selalu, agar backward compatible)
+        if not self.watcher_started:
+            self.ensemble_trainer.start_csv_watcher()
+            self.watcher_started = True
+            if self.gui_queue:
+                self.gui_queue.put({"type": "log", "record": "[LiveScrape] Watcher CSV dimulai."})
+
+        # Jalankan live scraping API jika mode bukan hanya csv
+        if mode in ("api", "both"):
+            t = threading.Thread(target=live_scrape_api, daemon=True)
+            t.start()
+            if self.gui_queue:
+                self.gui_queue.put({"type": "log", "record": "[LiveScrape] Thread live scraping API dijalankan."})
 
     def stop_live_scrape(self, button):
-        """Menghentikan tugas live scraping yang sedang berjalan."""
-        if self.active_agent:
-            logging.info("Mengirim sinyal berhenti ke agen live scrape...")
-            self.active_agent.stop()
-            self.active_agent = None
-            # GUI akan di-update melalui pesan 'live_scrape_finished' dari thread
-        else:
-            logging.warning("Tidak ada tugas live scrape yang sedang berjalan untuk dihentikan.")
-            if button and self.gui_queue is not None:
-                 self.gui_queue.put({"type": "task_finished", "button": button})
+        if hasattr(self, 'live_scrape_stop_event') and self.live_scrape_stop_event:
+            self.live_scrape_stop_event.set()
+            if self.gui_queue:
+                self.gui_queue.put({"type": "log", "record": "[LiveScrape] Stop signal dikirim ke live scraping API."})
+        # Tidak perlu menghentikan watcher CSV, biarkan tetap berjalan (atau tambahkan stop jika ingin)
+
+    def start_hyperparameter_search(self, button, progress_bar, eta_label, log_widget, n_trials=30):
+        def run_search():
+            self.ensemble_trainer.run_optuna_search(n_trials=n_trials)
+        self.run_in_thread(run_search, button, progress_bar, eta_label, log_widget)
 
     def start_task(self, task_name, button, progress_bar, eta_label, log_widget):
-        """
-        Placeholder for task execution. All training/evaluation tasks have been removed.
-        """
-        logging.error(f"Task '{task_name}' is no longer available.")
-        if button and self.gui_queue is not None:
-            self.gui_queue.put({"type": "task_finished", "button": button})
+        # Pastikan ensemble_trainer selalu pakai controller terbaru
+        self.ensemble_trainer.controller = self.gui_controller
+        def run_train_ensemble():
+            self.ensemble_trainer.train_ensemble()
+        def run_evaluate_ensemble():
+            self.ensemble_trainer.evaluate_ensemble()
+        def run_predict_ensemble():
+            self.ensemble_trainer.predict_ensemble()
+        def run_feature_importance():
+            self.ensemble_trainer.show_feature_importance()
+        def run_ensemble_analysis():
+            self.ensemble_trainer.show_ensemble_analysis()
+        def run_hyperparameter_search():
+            self.start_hyperparameter_search(button, progress_bar, eta_label, log_widget)
+        if task_name == "train_ensemble":
+            self.run_in_thread(run_train_ensemble, button, progress_bar, eta_label, log_widget)
+        elif task_name == "evaluate_ensemble":
+            self.run_in_thread(run_evaluate_ensemble, button, progress_bar, eta_label, log_widget)
+        elif task_name == "predict_ensemble":
+            self.run_in_thread(run_predict_ensemble, button, progress_bar, eta_label, log_widget)
+        elif task_name == "feature_importance":
+            self.run_in_thread(run_feature_importance, button, progress_bar, eta_label, log_widget)
+        elif task_name == "ensemble_analysis":
+            self.run_in_thread(run_ensemble_analysis, button, progress_bar, eta_label, log_widget)
+        elif task_name == "hyperparameter_search":
+            run_hyperparameter_search()
+        else:
+            logging.error(f"Task '{task_name}' is no longer available.")
+            if button and self.gui_queue is not None:
+                self.gui_queue.put({"type": "task_finished", "button": button})

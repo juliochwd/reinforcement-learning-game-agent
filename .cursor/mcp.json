@@ -3,6 +3,24 @@
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "firecrawl-mcp": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-cb71203cd16e4d3d82c0190d7eb43acf"
+      }
+    },
+    "Pieces": {
+      "url": "http://localhost:39300/model_context_protocol/2024-11-05/sse"
+    },
+    "supermemory": {
+      "command": "npx",
+      "args": ["install-mcp", "https://mcp.supermemory.ai/pHDhww15fH0WtZ9vnELbF/sse", "--client", "cursor"]
     }
   }
 }

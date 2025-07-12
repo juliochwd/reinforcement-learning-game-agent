@@ -1,0 +1,132 @@
+---
+alwaysApply: true
+---
+
+- All implementations must follow industry standards and best practices at each stage.
+# PROJECT RULES (ALWAYS APPLY)
+
+## Coding Standards
+- Python 3.10+, PEP8, modular, type hint, docstring, lulus linter & unit test.
+- Tidak boleh hardcode path, API key, credential di kode.
+
+## Data Handling & Anti-Leakage
+- Split data kronologis, tidak ada data masa depan di train.
+- Feature engineering hanya dari Number (lag, rolling, fourier). Dilarang Premium, Big/Small, Color, streak, corr, wavelet, dsb.
+- Tidak boleh ada fitur masa depan, label leakage, lookahead bias.
+- Audit otomatis X_cols, distribusi label, shape, anti-leakage wajib setiap perubahan besar.
+- Semua data hanya disimpan lokal.
+
+## Model Training & Evaluation
+- Hanya gunakan fitur yang sudah diaudit.
+- Hyperparameter tuning dengan Optuna, logging, anti-overfitting.
+- Evaluasi wajib: akurasi single-label (top-1), multi-number (top-N), confusion matrix, classification report.
+- Overfitting monitoring: warning jika gap train-test > 0.1.
+- Setiap perubahan fitur WAJIB training ulang.
+
+## Deployment & Production
+- Semua proses thread-safe, tidak blocking GUI.
+- Logging hanya ke file lokal.
+- Model hanya diupdate dengan data valid & diaudit.
+- Tidak ada update otomatis dari sumber tidak terpercaya.
+- Backup model & data rutin. Endpoint tidak boleh diexpose tanpa autentikasi.
+
+## Security & Privacy
+- Data user/game tidak pernah dibagikan ke pihak ketiga.
+- API key hanya di .cursor/mcp.json/env var, tidak di kode.
+- Jangan commit credential ke repo publik.
+- Scraping hanya dari endpoint legal.
+- Integrasi MCP hanya untuk fitur yang diizinkan.
+- Audit model & data sebelum deployment. Update dependency rutin.
+
+## MCP Integration
+- Semua MCP server harus di .cursor/mcp.json.
+- Jangan expose API key di kode/dokumentasi.
+- Tambah MCP baru harus audit keamanan.
+
+## Collaboration & Contribution
+- Semua kontribusi via pull request, lulus audit anti-leakage & unit test.
+- Perubahan besar didokumentasikan di CHANGELOG.md.
+- Diskusi arsitektur di issue sebelum implementasi.
+- Diskusi keamanan beri label `security`.
+
+## Audit & Testing
+- Jalankan unit test & audit integritas data sebelum merge/deploy.
+- Gunakan script audit (validate_data_integrity.py) untuk cek anti-leakage.
+- Semua log audit di folder logs/.
+- Audit manual setiap bulan/perubahan besar.
+
+## Troubleshooting & Support
+- Semua error dilog ke file & GUI.
+- Jika ada celah keamanan, segera lapor ke maintainer.
+- FAQ & troubleshooting selalu diupdate di README.md.
+
+---
+
+**SELURUH ATURAN INI SELALU DITERAPKAN OTOMATIS PADA SETIAP INTERAKSI DENGAN AGENT AI CURSOR.**
+
+
+**SELURUH ATURAN INI SELALU DITERAPKAN OTOMATIS PADA SETIAP INTERAKSI DENGAN AGENT AI CURSOR.**
+- All implementations must follow industry standards and best practices at each stage.
+# PROJECT RULES (ALWAYS APPLY)
+
+## Coding Standards
+- Python 3.10+, PEP8, modular, type hint, docstring, lulus linter & unit test.
+- Tidak boleh hardcode path, API key, credential di kode.
+
+## Data Handling & Anti-Leakage
+- Split data kronologis, tidak ada data masa depan di train.
+- Feature engineering hanya dari Number (lag, rolling, fourier). Dilarang Premium, Big/Small, Color, streak, corr, wavelet, dsb.
+- Tidak boleh ada fitur masa depan, label leakage, lookahead bias.
+- Audit otomatis X_cols, distribusi label, shape, anti-leakage wajib setiap perubahan besar.
+- Semua data hanya disimpan lokal.
+
+## Model Training & Evaluation
+- Hanya gunakan fitur yang sudah diaudit.
+- Hyperparameter tuning dengan Optuna, logging, anti-overfitting.
+- Evaluasi wajib: akurasi single-label (top-1), multi-number (top-N), confusion matrix, classification report.
+- Overfitting monitoring: warning jika gap train-test > 0.1.
+- Setiap perubahan fitur WAJIB training ulang.
+
+## Deployment & Production
+- Semua proses thread-safe, tidak blocking GUI.
+- Logging hanya ke file lokal.
+- Model hanya diupdate dengan data valid & diaudit.
+- Tidak ada update otomatis dari sumber tidak terpercaya.
+- Backup model & data rutin. Endpoint tidak boleh diexpose tanpa autentikasi.
+
+## Security & Privacy
+- Data user/game tidak pernah dibagikan ke pihak ketiga.
+- API key hanya di .cursor/mcp.json/env var, tidak di kode.
+- Jangan commit credential ke repo publik.
+- Scraping hanya dari endpoint legal.
+- Integrasi MCP hanya untuk fitur yang diizinkan.
+- Audit model & data sebelum deployment. Update dependency rutin.
+
+## MCP Integration
+- Semua MCP server harus di .cursor/mcp.json.
+- Jangan expose API key di kode/dokumentasi.
+- Tambah MCP baru harus audit keamanan.
+
+## Collaboration & Contribution
+- Semua kontribusi via pull request, lulus audit anti-leakage & unit test.
+- Perubahan besar didokumentasikan di CHANGELOG.md.
+- Diskusi arsitektur di issue sebelum implementasi.
+- Diskusi keamanan beri label `security`.
+
+## Audit & Testing
+- Jalankan unit test & audit integritas data sebelum merge/deploy.
+- Gunakan script audit (validate_data_integrity.py) untuk cek anti-leakage.
+- Semua log audit di folder logs/.
+- Audit manual setiap bulan/perubahan besar.
+
+## Troubleshooting & Support
+- Semua error dilog ke file & GUI.
+- Jika ada celah keamanan, segera lapor ke maintainer.
+- FAQ & troubleshooting selalu diupdate di README.md.
+
+---
+
+**SELURUH ATURAN INI SELALU DITERAPKAN OTOMATIS PADA SETIAP INTERAKSI DENGAN AGENT AI CURSOR.**
+
+
+**SELURUH ATURAN INI SELALU DITERAPKAN OTOMATIS PADA SETIAP INTERAKSI DENGAN AGENT AI CURSOR.**

@@ -1,84 +1,48 @@
-# Security Policy
+# SECURITY POLICY
 
-## Supported Versions
+## Data Security & Privacy
+- **Data user/game tidak pernah dibagikan ke pihak ketiga.**
+- **Semua data training, test, dan prediksi hanya disimpan lokal.**
+- **Tidak ada data sensitif yang diupload ke cloud tanpa izin eksplisit.**
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+## Anti-Data Leakage
+- **Pipeline dirancang anti-leakage:**
+  - Split data kronologis (tidak ada data masa depan di train).
+  - Feature engineering hanya dari Number (tanpa Premium, Big/Small, Color, dsb).
+  - Tidak ada fitur masa depan, label leakage, atau lookahead bias.
+  - Audit otomatis X_cols, distribusi label, shape, dan anti-leakage.
+- **Audit kode dan data dilakukan setiap perubahan besar.**
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+## Credential & API Key Management
+- **API key (misal FIRECRAWL_API_KEY) disimpan di .cursor/mcp.json, bukan di kode.**
+- **Jangan commit credential ke repo publik.**
+- **Gunakan environment variable untuk API key di server produksi.**
 
-## Security Features
+## Keamanan Scraping & Integrasi
+- **Scraping hanya dari endpoint resmi dan legal.**
+- **Tidak ada scraping data user tanpa izin.**
+- **Integrasi MCP (context7, firecrawl, supermemory, dsb.) hanya untuk fitur yang diizinkan.**
 
-This project implements several security measures:
+## Keamanan Pipeline & Model
+- **Model hanya diupdate dengan data baru yang valid.**
+- **Tidak ada update model otomatis dari sumber tidak terpercaya.**
+- **Audit model dan data dilakukan sebelum deployment.**
+- **Logging hanya ke file lokal, tidak ada remote logging tanpa izin.**
 
-### Credential Management
-- **No Hardcoded Credentials**: All credentials are input via secure GUI prompts
-- **Memory Security**: Credentials are cleared from memory after use
-- **Session Management**: Proper session handling and cleanup
+## Best Practice Keamanan
+- **Selalu training ulang model setelah perubahan fitur.**
+- **Audit pipeline dan data secara berkala.**
+- **Gunakan virtual environment untuk isolasi dependency.**
+- **Update dependency secara berkala, cek CVE/security advisory.**
+- **Jangan expose port/endpoint pipeline ke publik tanpa autentikasi.**
 
-### Web Security
-- **Input Validation**: All web inputs are validated and sanitized
-- **Error Handling**: Secure error handling without information leakage
-- **Rate Limiting**: Built-in rate limiting to prevent detection
-- **User Agent Rotation**: Configurable user agent management
+## Saran Keamanan Produksi
+- **Gunakan server dengan akses terbatas (firewall, VPN).**
+- **Pisahkan environment dev, staging, dan production.**
+- **Backup data dan model secara rutin.**
+- **Audit akses ke data dan model.**
+- **Gunakan monitoring untuk deteksi anomali/potensi serangan.**
 
-### Data Security
-- **Local Storage**: All data is stored locally, no external transmission
-- **Data Validation**: Comprehensive data validation before processing
-- **Secure Logging**: Logs do not contain sensitive information
+---
 
-## Reporting a Vulnerability
-
-We take security vulnerabilities seriously. To report a vulnerability:
-
-### For Non-Sensitive Issues
-1. **GitHub Issues**: Open a new issue in our [issue tracker](https://github.com/your-username/reinforcement-learning-game-agent/issues)
-2. Include detailed description and reproduction steps
-3. Provide relevant logs or screenshots
-
-### For Sensitive Issues
-1. **Email**: Send to `security@example.com`
-2. Include "SECURITY VULNERABILITY" in subject line
-3. We will respond within 48 hours
-
-### Required Information
-- Clear description of the vulnerability
-- Project version affected
-- Steps to reproduce
-- Potential impact assessment
-- Suggested fix (if available)
-
-## Security Best Practices
-
-### For Users
-- Keep the application updated
-- Use strong, unique passwords
-- Run on secure, private networks
-- Regularly review scraped data
-- Report suspicious activities
-
-### For Developers
-- Follow secure coding practices
-- Validate all inputs
-- Implement proper error handling
-- Use secure communication protocols
-- Regular security audits
-
-## Disclosure Policy
-
-1. **Responsible Disclosure**: We follow responsible disclosure practices
-2. **Timeline**: Critical issues addressed within 7 days
-3. **Communication**: Regular updates on fix progress
-4. **Credit**: Proper attribution for security researchers
-
-## Contact
-
-- **Security Email**: security@example.com
-- **GitHub Issues**: [Project Issues](https://github.com/your-username/reinforcement-learning-game-agent/issues)
-- **Response Time**: 48 hours for initial response
-
-## Updates
-
-This security policy is reviewed and updated regularly. Last updated: [Current Date]
+**Jika menemukan potensi celah keamanan, segera laporkan ke maintainer.**

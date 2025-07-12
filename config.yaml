@@ -1,87 +1,9 @@
-# ==============================================================================
-#      KONFIGURASI FINAL UNTUK AGEN DOUBLE DUELING DQN + LIGHTGBM
-# ==============================================================================
-#  Versi ini FOKUS pada arsitektur Dueling DQN dengan LightGBM sebagai
-#  function approximator, dilatih secara periodik.
-# ==============================================================================
-
+# Konfigurasi untuk pipeline River HoeffdingTreeClassifier dan scraping/GUI
 project_setup:
-  # Path relatif terhadap root direktori proyek.
   data_path: "data/databaru_from_api.csv"
   model_dir: "models/"
   log_dir: "logs/"
-  # Nama file untuk artefak-artefak penting.
-  strategist_model_name: "strategist_dqn/" # Direktori untuk model DQN
-  best_params_name: "best_strategist_params.json" # Hasil dari Hyperparameter Search
-  rl_scaler_name: "rl_feature_scaler.joblib"    # Scaler yang digunakan untuk melatih Agen RL
 
-data_preprocessing:
-  # Rasio pembagian data kronologis: 70% Train, 15% Val, 15% Test.
-  train_ratio: 0.7
-  val_ratio: 0.15
-
-environment:
-  # Ukuran window historis untuk state.
-  window_size: 15
-  # Persentase taruhan dari balance. [Level 1, Level 2]
-  bet_percentages: [0.01, 0.025]
-  payout_ratio: 0.95
-  transaction_cost: 0.001
-  reward_strategy: 'sharpe_ratio'
-  reward_sharpe_window: 50
-  hold_penalty: 0.00001
-
-dqn_agent:
-  # Total langkah training untuk model final.
-  total_timesteps: 75000
-  eval_freq: 2500
-  learning_starts: 5000
-  buffer_size: 50000
-  batch_size: 1024
-  gamma: 0.99
-  learning_rate: 0.0001
-  tau: 0.005 # Untuk soft update
-  hidden_dims: 256
-  early_stopping_patience: 5
-  early_stopping_threshold: 0.01
-  # Parameter Epsilon-Greedy
-  epsilon_start: 1.0
-  epsilon_end: 0.05
-  epsilon_decay: 0.9995
-
-hyperparameter_search:
-  n_trials: 50
-  total_timesteps_trial: 25000
-  search_space:
-    batch_size: [512, 1024, 2048]
-    gamma: { low: 0.98, high: 0.999 }
-    learning_rate: { low: 0.00005, high: 0.001, log: true }
-    hidden_dims: [128, 256, 512]
-
-walk_forward_validation:
-  initial_train_size: 15000 # Ukuran data awal untuk melatih model pertama kali
-  test_size: 2500          # Ukuran setiap set tes (fold)
-  step_size: 2500          # Seberapa jauh jendela digeser setiap kali
-
-forecaster_model:
-  model_name: "forecaster_lgbm.joblib"
-  scaler_name: "forecaster_scaler.joblib"
-  lgbm_params:
-    objective: 'binary'
-    metric: 'logloss'
-    n_estimators: 500
-    learning_rate: 0.02
-    num_leaves: 31
-    max_depth: 7
-    seed: 42
-    n_jobs: -1
-    verbose: -1
-    colsample_bytree: 0.7
-    subsample: 0.7
-    reg_alpha: 0.1
-    reg_lambda: 0.1
-
-# Konfigurasi UI
 ui:
   title: "Game Agent Control Center"
   geometry: "900x700"
@@ -90,20 +12,19 @@ ui:
   sidebar_buttons:
     "Data Management": "💾"
 
-# Konfigurasi lainnya
 logging:
   level: "INFO"
   format: "%(asctime)s - %(levelname)s - %(message)s"
   datefmt: "%Y-%m-%d %H:%M:%S"
 
-# --- Konfigurasi Web Agent & Scraping (DIPERTAHANKAN) ---
+# Konfigurasi Web Agent & Scraping (DIPERTAHANKAN)
 web_agent:
   login_url: "https://wirgako.com/#/login"
   api_endpoint: "api.55fiveapi.com/api/webapi/GetNoaverageEmerdList"
   initial_balance: 2000000
   bet_unit_divisor: 1000 # e.g., 1000 units = 1000 currency
   scraping:
-    max_pages: 100
+    max_pages: 2000
     zoom_level: "80%"
   timeouts:
     page_load: 60
@@ -115,7 +36,7 @@ web_agent:
     post_login_sleep: 3
     post_action_sleep: 1
     popup_check_sleep: 0.5
-    api_retry_delay: 2
+    api_retry_delay: 120
   xpaths:
     login:
       user_input: { by: "NAME", value: "userNumber" }
