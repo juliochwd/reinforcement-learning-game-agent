@@ -177,7 +177,7 @@ class SupervisedEnsembleTrainer:
             # Best Practice: Pruning (trial.report, trial.should_prune) hanya didukung untuk single-objective di Optuna.
             # Untuk multi-objective, jangan gunakan pruning.
             params = {
-                'max_depth': trial.suggest_int('max_depth', 2, 10),
+                'max_depth': trial.suggest_int('max_depth', 2, 5),
                 'grace_period': trial.suggest_int('grace_period', 10, 200),
             }
             if 'delta' in supported_params:
