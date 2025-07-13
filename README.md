@@ -5,14 +5,19 @@ Pipeline produksi untuk supervised online learning prediksi Number pada game, me
 
 ## Fitur Utama
 - **Supervised Online Learning**: River HoeffdingTreeClassifier, update model real-time.
+- **Ensemble Default**: VotingEnsemble (beberapa HoeffdingTree) sebagai model default, lebih stabil.
+- **Model Versioning & Rollback Otomatis**: Model dan metadata disimpan per versi, rollback otomatis jika streak/drift ekstrem.
 - **Feature Engineering Anti-Leakage**: Hanya lag, rolling, fourier dari Number (tanpa Premium, Big/Small, Color, dsb).
 - **Hyperparameter Tuning**: Optuna, anti-overfitting, logging lengkap, dashboard-ready.
-- **Evaluasi Lengkap**: Akurasi single-label (top-1) & multi-number (top-N, confidence threshold).
+- **Evaluasi Lengkap**: Akurasi multi-number (top-N, confidence threshold), longest losing streak, drift monitoring.
+- **Objective Training Modern**: Model dilatih untuk minimasi longest losing streak pada prediksi multi-number, bukan hanya single-label accuracy.
 - **Prediksi Online**: Prediksi beberapa Number sekaligus (multi-number) sesuai threshold confidence.
-- **GUI Modern**: customtkinter, tab Settings, Logs, Data Management, Training, dsb.
+- **GUI Modern & Monitoring**: customtkinter, tab Monitoring (grafik streak, distribusi prediksi, drift), Settings, Logs, Data Management, Training, dsb.
 - **Realtime CSV/API Watcher**: Monitoring data baru, prediksi otomatis, update model.
 - **Audit & Logging**: Audit anti-leakage, logging ke file & GUI, audit fitur otomatis.
+- **Notifikasi Telegram Otomatis**: Rollback, drift, streak ekstrem langsung ke Telegram.
 - **Integrasi MCP**: Mendukung context7, sequential-thinking, firecrawl-mcp, Pieces, supermemory.
+- **CI/CD Otomatis**: Linter, unit test, audit anti-leakage otomatis di GitHub Actions.
 
 ## Arsitektur
 - `src/app/supervised_ensemble_trainer.py`: Pipeline utama training, evaluasi, prediksi, watcher.
@@ -56,17 +61,16 @@ Pipeline produksi untuk supervised online learning prediksi Number pada game, me
    ```
 
 ## Evaluasi Model
-- **Akurasi single-label (top-1):**
+- **Akurasi multi-number (top-N, confidence threshold) & Longest Losing Streak:**
   ```python
-  trainer.evaluate_ensemble()
+  result = trainer.evaluate_with_confidence_threshold(threshold=0.7)
+  print(result['multi_number_accuracy'])
+  print(result['longest_losing_streak'])
+  # Output contoh:
+  # multi_number_accuracy: 0.42
+  # longest_losing_streak: 5
   ```
-- **Akurasi multi-number (top-N, confidence threshold):**
-  ```python
-  trainer.evaluate_ensemble(threshold=0.7)
-  # atau
-  trainer.show_multinumber_accuracy(threshold=0.7)
-  ```
-- **Analisis model (confusion matrix, classification report, multi-number accuracy):**
+- **Analisis model (confusion matrix, classification report, multi-number accuracy, longest losing streak):**
   ```python
   trainer.show_ensemble_analysis(threshold=0.7)
   ```
@@ -83,23 +87,22 @@ Pipeline produksi untuk supervised online learning prediksi Number pada game, me
 - `.cursor/mcp.json` sudah mendukung context7, sequential-thinking, firecrawl-mcp, Pieces, supermemory.
 - Untuk menambah MCP baru, tambahkan entry sesuai format di file tersebut.
 
-## Troubleshooting
-- **Model error saat prediksi:** Pastikan sudah training ulang setelah perubahan fitur.
-- **Akurasi rendah:** Data Number memang acak, pipeline sudah anti-leakage.
-- **Linter error:** Sudah diatasi dengan type checking, type: ignore, dan isinstance.
-- **Warning pywt:** Sudah tidak ada fitur wavelet, warning aman diabaikan.
+## Monitoring & Visualisasi
+- Tab Monitoring di GUI: grafik streak kekalahan, distribusi prediksi, dan deteksi drift real-time.
+- Semua event penting (rollback, drift, streak ekstrem) otomatis dikirim ke Telegram.
+
+## Deployment & Troubleshooting
+- Model versioning otomatis, rollback mudah jika performa menurun.
+- Semua error, rollback, drift, dan streak ekstrem tercatat di log, GUI, dan Telegram.
+- CI/CD: Setiap push/PR otomatis audit, linter, dan unit test.
 
 ## FAQ
-- **Q: Kenapa akurasi rendah?**
-  - A: Karena hanya fitur Number yang digunakan, tidak ada pola prediktif kuat (anti-leakage).
-- **Q: Bolehkah menambah fitur lain?**
-  - A: Boleh, tapi risiko data leakage tinggi. Pipeline ini dirancang untuk keamanan maksimal.
-- **Q: Bagaimana menambah MCP baru?**
-  - A: Edit `.cursor/mcp.json` sesuai format.
-- **Q: Bagaimana mengubah threshold confidence?**
-  - A: Ubah argumen `threshold` pada fungsi evaluasi/prediksi.
+- **Q: Kenapa streak kekalahan bisa panjang?**
+  - A: Karena data Number acak dan hanya fitur Number yang digunakan (anti-leakage), model tetap bisa mengalami streak panjang. Tuning weight streak di training bisa membantu.
+- **Q: Bagaimana mengubah fokus training ke streak?**
+  - A: Atur parameter `weight_streak` di `SupervisedEnsembleTrainer`.
 
 ---
 
-**Pipeline ini sudah siap produksi, robust, modular, dan anti-leakage.**
+**Pipeline ini sudah siap produksi, robust, modular, anti-leakage, dan kini fokus pada minimasi streak kekalahan multi-number.**
 Jika ada pertanyaan atau ingin integrasi lebih lanjut, silakan hubungi maintainer.

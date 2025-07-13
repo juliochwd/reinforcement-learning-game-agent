@@ -26,12 +26,16 @@
 ## Keamanan Pipeline & Model
 - **Model hanya diupdate dengan data baru yang valid.**
 - **Tidak ada update model otomatis dari sumber tidak terpercaya.**
-- **Audit model dan data dilakukan sebelum deployment.**
+- **Audit model dan data dilakukan sebelum deployment (otomatis & manual).**
 - **Logging hanya ke file lokal, tidak ada remote logging tanpa izin.**
+- **Monitoring drift, overfitting, streak kekalahan, dan rollback:** Pipeline otomatis memonitor distribusi data, gap train-test, streak kekalahan multi-number, dan rollback ke model terbaik jika perlu. Semua event penting dikirim ke Telegram.
+- **Model versioning & rollback:** Model disimpan versi per training, dan dapat di-rollback ke versi sebelumnya jika diperlukan (misal: deteksi drift/streak ekstrem).
+- **Monitoring GUI:** Semua metrik dan event penting divisualisasikan di tab Monitoring GUI.
+- **CI/CD:** Audit, linter, dan unit test otomatis di setiap push/PR.
 
 ## Best Practice Keamanan
 - **Selalu training ulang model setelah perubahan fitur.**
-- **Audit pipeline dan data secara berkala.**
+- **Audit pipeline dan data secara berkala (otomatis & manual).**
 - **Gunakan virtual environment untuk isolasi dependency.**
 - **Update dependency secara berkala, cek CVE/security advisory.**
 - **Jangan expose port/endpoint pipeline ke publik tanpa autentikasi.**
@@ -39,9 +43,10 @@
 ## Saran Keamanan Produksi
 - **Gunakan server dengan akses terbatas (firewall, VPN).**
 - **Pisahkan environment dev, staging, dan production.**
-- **Backup data dan model secara rutin.**
+- **Backup data dan model secara rutin (otomatis/manual).**
 - **Audit akses ke data dan model.**
-- **Gunakan monitoring untuk deteksi anomali/potensi serangan.**
+- **Gunakan monitoring untuk deteksi anomali/potensi serangan, termasuk streak kekalahan ekstrem.**
+- **Rollback model ke versi sebelumnya jika performa menurun drastis atau streak kekalahan sangat panjang.**
 
 ---
 

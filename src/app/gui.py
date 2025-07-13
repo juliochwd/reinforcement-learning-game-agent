@@ -10,6 +10,10 @@ from src.utils.logging_utils import setup_logging, log_audit
 import webbrowser
 from tkinter import filedialog
 import subprocess
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # --- Path Setup ---
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -87,7 +91,7 @@ class App(ctk.CTk):
         self.ui_config = self.config.get('ui', {})
         # Inisialisasi default training_settings agar tidak error
         self.training_settings = {
-            'split_ratio': 0.2,
+            'split_ratio': 0.1,
             'window_sizes': [10, 30, 50],
             'n_lags': 10,
             'n_trials': 30,
@@ -150,7 +154,8 @@ class App(ctk.CTk):
         sidebar_buttons = [
             ("Data Management", "📊"),
             ("Settings", "⚙️"),
-            ("Logs", "📝")
+            ("Logs", "📝"),
+            ("Monitoring", "📈")
         ]
         for i, (name, icon) in enumerate(sidebar_buttons):
             btn = ctk.CTkButton(
@@ -173,7 +178,7 @@ class App(ctk.CTk):
         self.main_area.grid_rowconfigure(0, weight=1)
         self.main_area.grid_columnconfigure(0, weight=1)
         self.pages = {}
-        for PageClass in (PageData, PageSettings, PageLogs):
+        for PageClass in (PageData, PageSettings, PageLogs, PageMonitoring):
             page = PageClass(self.main_area, self)
             self.pages[PageClass.__name__] = page
             page.grid(row=0, column=0, sticky="nsew")  # Ganti pack menjadi grid
@@ -182,7 +187,8 @@ class App(ctk.CTk):
         page_map = {
             "Data Management": "PageData",
             "Settings": "PageSettings",
-            "Logs": "PageLogs"
+            "Logs": "PageLogs",
+            "Monitoring": "PageMonitoring"
         }
         page_name = page_map.get(page_name_str)
         if page_name and page_name in self.pages:
@@ -229,6 +235,8 @@ class App(ctk.CTk):
                         self.active_log_widget.yview(tk.END)
                 elif msg_type == "prediction_update":
                     self.pages["PageData"].update_prediction_display(msg['numbers'], msg['confidence'])
+                elif msg_type == "monitoring_update":
+                    self.pages["PageMonitoring"].update_monitoring(msg.get("data", {}))
         except queue.Empty:
             pass
         self.after(100, self.process_gui_queue)
@@ -251,9 +259,16 @@ class PageData(PageBase):
         ctk.CTkLabel(creds_frame, text="Phone Number", font=self.controller.fonts["BODY"], text_color="#222").grid(row=0, column=0, sticky="w", padx=20, pady=15)
         self.phone_entry = ctk.CTkEntry(creds_frame, placeholder_text="Enter phone number", font=self.controller.fonts["BODY"], height=35)
         self.phone_entry.grid(row=0, column=1, sticky="ew", padx=20, pady=15)
+        # Set default from env if available
+        phone_env = os.environ.get('PHONE_NUMBER')
+        if phone_env:
+            self.phone_entry.insert(0, phone_env)
         ctk.CTkLabel(creds_frame, text="Password", font=self.controller.fonts["BODY"], text_color="#222").grid(row=1, column=0, sticky="w", padx=20, pady=15)
         self.password_entry = ctk.CTkEntry(creds_frame, show="*", font=self.controller.fonts["BODY"], height=35)
         self.password_entry.grid(row=1, column=1, sticky="ew", padx=20, pady=15)
+        password_env = os.environ.get('PASSWORD')
+        if password_env:
+            self.password_entry.insert(0, password_env)
         action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
         action_buttons_frame.grid(row=2, column=0, sticky="ew", pady=(20, 0))
         action_buttons_frame.grid_columnconfigure(0, weight=1)
@@ -353,8 +368,8 @@ class PageData(PageBase):
         return progress_bar, eta_label
 
     def start_scraping(self):
-        phone = self.phone_entry.get()
-        password = self.password_entry.get()
+        phone = os.environ.get('PHONE_NUMBER') or self.phone_entry.get()
+        password = os.environ.get('PASSWORD') or self.password_entry.get()
         # Phone validation
         if not phone or not phone.isdigit() or len(phone) < 8:
             self.controller.show_error_dialog("Input Error", "Phone number harus diisi dan berupa angka minimal 8 digit.")
@@ -377,8 +392,8 @@ class PageData(PageBase):
             self.controller.show_error_dialog("Scraping Error", str(e))
 
     def toggle_live_scrape(self):
-        phone = self.phone_entry.get()
-        password = self.password_entry.get()
+        phone = os.environ.get('PHONE_NUMBER') or self.phone_entry.get()
+        password = os.environ.get('PASSWORD') or self.password_entry.get()
         # Phone validation
         if not phone or not phone.isdigit() or len(phone) < 8:
             self.controller.show_error_dialog("Input Error", "Phone number harus diisi dan berupa angka minimal 8 digit.")
@@ -433,7 +448,7 @@ class PageData(PageBase):
         except Exception as e:
             import logging
             logging.error(f"Exception in train_ensemble: {e}", exc_info=True)
-            self.controller.show_error_dialog("Training Error", str(e))
+            self.controller.show_error_dialog("Train Error", str(e))
     def evaluate_ensemble(self):
         self.active_log_widget = self.log_widget
         try:
@@ -553,7 +568,7 @@ class PageSettings(PageBase):
         # Split ratio
         ctk.CTkLabel(frame, text="Train/Val Split Ratio (0-1)", font=controller.fonts["BODY"], fg_color="transparent").grid(row=0, column=0, sticky="w", pady=5)
         self.entries['split_ratio'] = ctk.CTkEntry(frame)
-        self.entries['split_ratio'].insert(0, str(controller.training_settings.get('split_ratio', 0.2)))
+        self.entries['split_ratio'].insert(0, str(controller.training_settings.get('split_ratio', 0.1)))
         self.entries['split_ratio'].grid(row=0, column=1, sticky="ew", pady=5)
         # Window sizes
         ctk.CTkLabel(frame, text="Window Sizes (comma, e.g. 10,30,50)", font=controller.fonts["BODY"], fg_color="transparent").grid(row=1, column=0, sticky="w", pady=5)
@@ -739,3 +754,45 @@ class PageLogs(PageBase):
         except Exception as e:
             import logging
             logging.error(f"Failed to clear log file: {e}")
+
+class PageMonitoring(PageBase):
+    def __init__(self, parent, controller):
+        super().__init__(parent, controller)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        title_label = ctk.CTkLabel(self, text="Monitoring & Visualization", font=self.controller.fonts["MAIN_TITLE"], text_color="#222")
+        title_label.grid(row=0, column=0, sticky="w", pady=(0, 20))
+        # Matplotlib Figure
+        self.fig = Figure(figsize=(8, 4), dpi=100)
+        self.ax_streak = self.fig.add_subplot(131)
+        self.ax_pred = self.fig.add_subplot(132)
+        self.ax_drift = self.fig.add_subplot(133)
+        self.ax_streak.set_title("Losing Streak")
+        self.ax_pred.set_title("Distribusi Prediksi")
+        self.ax_drift.set_title("Drift Monitor")
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.get_tk_widget().grid(row=1, column=0, sticky="nsew")
+        self.last_data = None
+        self.update_monitoring({})
+    def update_monitoring(self, data):
+        # data: {'streaks': [...], 'pred_dist': {...}, 'drift': [...]} atau kosong
+        self.ax_streak.clear()
+        self.ax_pred.clear()
+        self.ax_drift.clear()
+        self.ax_streak.set_title("Losing Streak")
+        self.ax_pred.set_title("Distribusi Prediksi")
+        self.ax_drift.set_title("Drift Monitor")
+        if data:
+            if 'streaks' in data:
+                self.ax_streak.plot(data['streaks'], color='red')
+                self.ax_streak.set_ylabel('Streak')
+            if 'pred_dist' in data:
+                keys = list(data['pred_dist'].keys())
+                vals = list(data['pred_dist'].values())
+                self.ax_pred.bar(keys, vals, color='blue')
+                self.ax_pred.set_ylabel('Count')
+            if 'drift' in data:
+                self.ax_drift.plot(data['drift'], color='orange')
+                self.ax_drift.set_ylabel('Drift Score')
+        self.fig.tight_layout()
+        self.canvas.draw()
