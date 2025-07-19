@@ -8,10 +8,12 @@ echo.
 :: Set environment variables for current session
 set PHONE_NUMBER=82284608240
 set PASSWORD=Dh4910va
+set GEMINI_API_KEY=AIzaSyDykHVvf8UFWXyotZDPE6tgFQ7OuTfesuQ
 
 :: Set persistent environment variables (user-level)
 setx PHONE_NUMBER "82284608240" >nul 2>&1
 setx PASSWORD "Dh4910va" >nul 2>&1
+setx GEMINI_API_KEY "AIzaSyDykHVvf8UFWXyotZDPE6tgFQ7OuTfesuQ" >nul 2>&1
 
 if errorlevel 1 (
     echo WARNING: Could not set persistent environment variables.
@@ -21,6 +23,7 @@ if errorlevel 1 (
     echo.
     echo PHONE_NUMBER: 82284608240
     echo PASSWORD: [HIDDEN]
+    echo GEMINI_API_KEY: [HIDDEN]
 )
 
 echo.

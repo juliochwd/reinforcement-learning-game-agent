@@ -14,9 +14,10 @@ class DataScraper:
     Bertanggung jawab untuk semua operasi scraping data dari situs web,
     baik dari UI maupun dengan mencegat panggilan API.
     """
-    def __init__(self, driver, config):
+    def __init__(self, driver, config, gemini_predictor=None):
         self.driver = driver
         self.config = config
+        self.gemini_predictor = gemini_predictor
         self.web_agent_config = self.config.get('web_agent', {})
         self.timeouts = self.web_agent_config.get('timeouts', {})
         self.timers = self.web_agent_config.get('timers', {})
@@ -447,6 +448,23 @@ class DataScraper:
                         combined_df = combined_df.sort_values(by='Period', ascending=True)
                         if not combined_df.equals(existing_df):
                             combined_df.to_csv(output_csv_path, index=False)
+                            if self.gemini_predictor:
+                                logging.info("Memanggil Gemini untuk prediksi periode berikutnya...")
+                                try:
+                                    context_df = combined_df.tail(200)
+                                    prediction_result = self.gemini_predictor.predict_next_period(context_df)
+                                    prediction_path = os.path.join(os.path.dirname(output_csv_path), "next_prediction.txt")
+                                    with open(prediction_path, "w") as f:
+                                        f.write(prediction_result)
+                                    logging.info(f"Prediksi disimpan ke {prediction_path}")
+                                    # Tampilkan prediksi di konsol
+                                    print("\n--- PREDIKSI PERIODE BERIKUTNYA ---")
+                                    print(prediction_result)
+                                    print("-------------------------------------\n")
+                                except Exception as e:
+                                    logging.error(f"Gagal menghasilkan atau menyimpan prediksi: {e}", exc_info=True)
+                        else:
+                            logging.info("Tidak ada data baru yang terdeteksi. Melewati penyimpanan dan prediksi.")
                     else:
                         logging.warning("Combined DataFrame is not a DataFrame, skipping save.")
 

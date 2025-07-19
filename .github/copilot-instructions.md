@@ -1,52 +1,87 @@
-# Copilot Instructions for Game Agent Data Scraper
+# Copilot Instructions for Advanced Ensemble Game Agent
 
 ## Architecture Overview
 
-This is a **dual-mode web scraping application** that extracts game data from the "Win Go" platform. Originally designed as a reinforcement learning project, it now offers both GUI-driven and shell-based execution modes for data collection through Selenium automation.
+This is an **Advanced Ensemble Machine Learning System** for game prediction with integrated data scraping capabilities. Originally a reinforcement learning project, it has evolved into a sophisticated supervised learning system with **anti-leakage guarantees** and real-time prediction capabilities targeting **Big/Small** classification (Number > 4 = Big, 0-4 = Small).
 
 ### Core Components & Data Flow
 
 ```
 Entry Points:
-  main.py (GUI) → TaskOrchestrator → RealtimeAgent → BrowserManager + DataScraper
+  main.py (GUI) → TaskOrchestrator → AdvancedEnsemble → SRPClassifier/TreeClassifier
   scraper_shell.py (CLI) → MockQueue → RealtimeAgent → BrowserManager + DataScraper
+  start.py (Menu) → Interactive Selection → All Operations
        ↓               ↓                    ↓              ↓
-  config.yaml → GUI/Console → Browser → API Interception → CSV Output
+  config.yaml → GUI/Console → Browser/ML → API/Training → CSV/Predictions
 ```
 
 **Key Files:**
-- `main.py`: GUI entry point with config loading and tkinter initialization
-- `scraper_shell.py`: Command-line entry point for shell-based execution with optional Gemini AI
-- `config.yaml`: Central configuration for all selectors, timeouts, and settings
-- `src/app/gui.py`: CustomTkinter-based GUI with real-time progress tracking
-- `src/app/task_orchestrator.py`: Threading manager preventing GUI blocking
+- `main.py`: GUI entry point with ensemble ML and scraping capabilities  
+- `scraper_shell.py`: Command-line entry point with optional Gemini 2.5 Flash AI
+- `start.py`: Cross-platform interactive menu for all operations
+- `config.yaml`: Central configuration for selectors, timeouts, ML strategies, and anti-leakage settings
+- `src/app/gui.py`: CustomTkinter GUI with ML training, monitoring, and prediction tabs
+- `src/app/task_orchestrator.py`: Threading manager for GUI and ML operations
 - `src/rl_agent/realtime_agent.py`: Main orchestrator for scraping operations
 - `src/rl_agent/browser_manager.py`: Selenium WebDriver lifecycle management
 - `src/rl_agent/data_scraper.py`: Core scraping logic with API interception
-- `src/rl_agent/gemini_predictor.py`: Google Gemini AI integration for predictive analysis
+- `src/rl_agent/gemini_predictor.py`: Google Gemini 2.5 Flash with thinking capabilities
 
 ### Execution Modes
 
-**GUI Mode (Traditional):**
+**GUI Mode (Machine Learning + Scraping):**
 ```bash
-python main.py  # Launches full GUI interface
+python main.py  # Full GUI with ML training, prediction, and scraping tabs
 ```
 
-**Shell Mode (Enhanced):**
+**Shell Mode (Enhanced with AI):**
 ```bash
 python scraper_shell.py --mode bulk --phone 1234567890
-python scraper_shell.py --mode live --phone 1234567890 --password mypass
 python scraper_shell.py --mode live --model gemini-2.5-flash  # With AI analysis
 ```
 
-**Batch Launchers:**
+**Interactive Menu (Recommended):**
+```bash
+python start.py  # Cross-platform menu system for all operations
+start.bat        # Windows batch launcher (14 integrated functions)
+```
+
+**Specialized Launchers:**
 - `setup.bat` - One-time environment setup
-- `run_bulk_scrape.bat` - Simple bulk data collection
+- `run_bulk_scrape.bat` - Simple bulk data collection  
 - `run_live_scrape.bat` - Live monitoring with auto-stop
-- `start.bat` - Interactive menu system
 - `set_credentials.bat` - Environment variable management
 
 ## Development Patterns
+
+### Anti-Leakage Machine Learning Architecture
+- **PRIMARY TARGET**: Big/Small classification (Number > 4 = Big, 0-4 = Small)
+- **NO DATA LEAKAGE**: Chronological splits, lag-only features, no future data in training
+- **FORBIDDEN FEATURES**: Premium, Color, streak, correlation, wavelet - only use `engineer_features_number_full_anti_leakage()`
+- **ENSEMBLE STRATEGIES**: SRPClassifier (primary), ExtremelyFastDecisionTreeClassifier (speed), LogisticRegression (stable)
+- **AUTOMATED AUDITING**: Anti-leakage validation, performance monitoring, rollback on drift
+
+### Advanced Ensemble Configuration
+```python
+# Strategy selection in config.yaml
+ensemble:
+  strategy: 'srp'  # Primary: Streaming Random Patches
+  fallback_strategy: 'fast_decision_tree'  # Speed fallback
+  gaming_mode: 'speed_balanced'  # Ultra-fast prediction (<2ms)
+  auto_optimization: true
+```
+
+### Gemini 2.5 Flash Integration Pattern
+```python
+# Enhanced thinking capabilities in GeminiPredictor
+generation_config = types.GenerationConfig(
+    thinking_config=types.ThinkingConfig(
+        thinking_budget=-1,
+        include_thoughts=True
+    )
+)
+# Outputs: "--- THOUGHTS ---" and "--- PREDICTION ---" sections
+```
 
 ### Configuration-Driven Architecture
 - **ALL selectors, timeouts, and URLs are in `config.yaml`** - never hardcode XPaths
@@ -103,17 +138,26 @@ if project_root not in sys.path:
 - Prevents infinite loops in continuous monitoring mode
 
 ### Data Processing Pipeline
-- API responses processed through `process_api_response()` in `src/utils/scraping.py`
+- **Primary Pipeline**: `engineer_features_number_full_anti_leakage()` (75+ features: lag, rolling, fourier, spectral)
+- **Target Processing**: Big/Small classification with automated audit validation
 - Data filtered for game type '10001' (Win Go 1min)
 - Output format: CSV with 'Period' and 'Number' columns
 - Default output: `data/databaru_from_api.csv`
+- **Anti-Leakage Reports**: Automated generation with security validation
+
+### MCP Integration (Model Context Protocol)
+- **Configuration**: `.cursor/mcp.json` with context7, sequential-thinking, firecrawl-mcp
+- **Enhanced Context**: Pieces and supermemory integrations for development
+- **AI Development**: Supports advanced reasoning and context-aware coding assistance
 
 ### Gemini AI Integration (Optional)
-- **GeminiPredictor**: Real-time analysis using Google's Gemini models
+- **GeminiPredictor**: Real-time analysis using Google's Gemini 2.5 Flash models
+- **Thinking Mode**: Enhanced reasoning with thought processes exposed (`include_thoughts=True`)
 - **Environment Setup**: Requires `GEMINI_API_KEY` in environment variables
 - **System Instructions**: Loads from `gemini_gems/petunjuk_gemini.md` and `gemini_gems/KODEKS_FINAL_PREDIKSI.md`
 - **Live Mode Integration**: Automatic report generation on new data events
 - **MockQueue Enhancement**: Shell mode MockQueue triggers AI analysis when `--model` specified
+- **Dual Output Format**: "--- THOUGHTS ---" and "--- PREDICTION ---" sections for transparency
 
 ## Development Workflows
 
@@ -131,6 +175,21 @@ python scraper_shell.py --mode fetch --url "https://api.example.com/data"
 stop_live_scraping.bat
 ```
 
+### Machine Learning Development Workflow
+```bash
+# Quick ensemble testing
+python quick_start.py
+
+# Full training pipeline with anti-leakage validation
+python main.py  # Use Training tab in GUI
+
+# Advanced ensemble benchmarking
+python demo_ensemble.py
+
+# Migration from legacy models
+python migrate_ensemble.py
+```
+
 ### Adding New Scraping Features
 1. Add XPath selectors to `config.yaml` under appropriate category
 2. Implement logic in `DataScraper` class using `_get_selector()` pattern
@@ -138,6 +197,13 @@ stop_live_scraping.bat
 4. **For GUI**: Add controls in `gui.py` with proper threading via `TaskOrchestrator`
 5. **For Shell**: Extend `scraper_shell.py` with new command-line arguments
 6. **For AI Enhancement**: Update `MockQueue` in shell mode to trigger analysis if needed
+
+### Adding Machine Learning Features
+1. **Ensemble Strategies**: Add new strategies to `src/app/ensemble_config.py` 
+2. **Feature Engineering**: Only modify `engineer_features_number_full_anti_leakage()` - other functions are deprecated
+3. **Anti-Leakage Validation**: Run automated auditing after any ML changes
+4. **Performance Monitoring**: Use built-in drift detection and rollback mechanisms
+5. **Testing**: Use `quick_start.py` for rapid iteration and validation
 
 ### Adding AI Analysis Features
 1. Update system instructions in `gemini_gems/` directory for specialized prompts
@@ -199,6 +265,11 @@ class MockQueue:
 - **Emergency Controls**: Stop utilities, backup systems, comprehensive logging
 - **AI Integration**: Optional Gemini AI analysis with real-time and batch modes
 - **Data Utilities**: External data fetching, viewing, backup, and analysis features
+
+## Data Output
+- Default output: `data/databaru_from_api.csv`
+- Format: Period (game ID), Number (result)
+- Filtering: Only Win Go 1min games (period contains '10001')
 
 ## Data Output
 - Default output: `data/databaru_from_api.csv`

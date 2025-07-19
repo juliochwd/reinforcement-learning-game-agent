@@ -17,11 +17,12 @@ class RealtimeAgent:
     Orkestrator utama untuk operasi real-time. Mengelola loop game,
     interaksi UI, pengambilan keputusan, dan komunikasi dengan GUI.
     """
-    def __init__(self, config, gui_queue, phone=None, password=None):
+    def __init__(self, config, gui_queue, phone=None, password=None, gemini_predictor=None):
         self.config = config
         self.gui_queue = gui_queue
         self.phone = phone
         self.password = password
+        self.gemini_predictor = gemini_predictor
         self.running = False
         self.stop_event = threading.Event()
         self.web_agent_config = self.config.get('web_agent', {})
@@ -95,7 +96,7 @@ class RealtimeAgent:
                 logging.error("Gagal menginisialisasi WebDriver untuk live scraping.")
                 return
 
-            self.data_scraper = DataScraper(driver, self.config)
+            self.data_scraper = DataScraper(driver, self.config, self.gemini_predictor)
             
             if not self.browser_manager.login(phone=self.phone, password=self.password) or not self.browser_manager.navigate_to_game():
                 logging.error("Gagal login atau navigasi untuk live scraping.")

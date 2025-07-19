@@ -10,6 +10,7 @@ pandas==2.1.3
 # For reading the configuration file
 PyYAML==6.0.1
 
-# For Gemini AI Integration
-google-generativeai
+# For Gemini AI Integration (use either google-genai OR google-generativeai, not both)
+google-genai>=1.26.0
+# google-generativeai>=0.3.0  # Alternative package
 python-dotenv

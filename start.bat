@@ -185,19 +185,7 @@ if errorlevel 1 goto MAIN_MENU
 call :ACTIVATE_ENV
 if errorlevel 1 goto MAIN_MENU
 echo(
-echo [T] Testing Gemini AI with sample data...
-echo(
-python -c "import sys; from src.rl_agent.gemini_predictor import GeminiPredictor; sys.stdout.reconfigure(encoding='utf-8');\
-try: \
-    predictor = GeminiPredictor('gemini-2.5-flash'); \
-    result = predictor.generate_holistic_report('Test data: 12345'); \
-    print('[V] Gemini AI Test SUCCESSFUL!'); \
-    print('Sample Response:'); \
-    print('-' * 40); \
-    print(result); \
-    print('-' * 40); \
-except Exception as e: \
-    print(f'[X] Gemini AI Test FAILED: {e}')"
+python src/utils/gemini_test.py
 echo(
 echo Press any key to return to menu...
 pause >nul
@@ -214,29 +202,7 @@ if errorlevel 1 goto MAIN_MENU
 call :ACTIVATE_ENV
 if errorlevel 1 goto MAIN_MENU
 echo(
-if exist "data\databaru_from_api.csv" goto :ANALYZE_DATA_EXISTS
-echo [X] No data file found at data\databaru_from_api.csv
-echo Please run scraping first to generate data.
-echo(
-echo Press any key to return to menu...
-pause >nul
-goto MAIN_MENU
-:ANALYZE_DATA_EXISTS
-echo(
-echo [A] Analyzing existing data with Gemini AI...
-echo(
-python -c "import sys; import pandas as pd; from src.rl_agent.gemini_predictor import GeminiPredictor; sys.stdout.reconfigure(encoding='utf-8');\
-try: \
-    df = pd.read_csv('data/databaru_from_api.csv'); \
-    latest_data = df.tail(10).to_string(); \
-    predictor = GeminiPredictor('gemini-2.5-flash'); \
-    analysis = predictor.generate_holistic_report(f'Latest 10 records: {latest_data}'); \
-    print('[R] GEMINI AI ANALYSIS REPORT'); \
-    print('=' * 50); \
-    print(analysis); \
-    print('=' * 50); \
-except Exception as e: \
-    print(f'[X] Analysis failed: {e}')"
+python src/utils/analyze_data.py
 echo(
 echo Press any key to return to menu...
 pause >nul
@@ -296,28 +262,7 @@ echo ==========================================
 echo [F] View Current Data
 echo ==========================================
 echo(
-if exist "data\databaru_from_api.csv" goto :VIEW_DATA_EXISTS
-echo [X] No scraping data found.
-echo Run scraping operations first to generate data.
-goto :VIEW_DATA_CONTINUE
-:VIEW_DATA_EXISTS
-echo [+] Latest scraping results:
-echo(
-python -c "import sys; import pandas as pd; sys.stdout.reconfigure(encoding='utf-8');\
-try: \
-    df = pd.read_csv('data/databaru_from_api.csv'); \
-    print(f'Total records: {len(df)}'); \
-    print('Latest 5 records:'); \
-    print('-' * 30); \
-    print(df.tail().to_string(index=False)); \
-    print('-' * 30); \
-    print(f'Date range: {df.iloc[0,0] if len(df) > 0 else 'N/A'} to {df.iloc[-1,0] if len(df) > 0 else 'N/A'}'); \
-except Exception as e: \
-    print(f'Error reading data: {e}')"
-:VIEW_DATA_CONTINUE
-echo(
-echo [F] Other data files:
-dir /b data\ 2>nul
+python src/utils/view_data.py
 echo(
 echo Press any key to return to menu...
 pause >nul
@@ -401,39 +346,7 @@ echo ==========================================
 echo [R] System Status and Environment Check
 echo ==========================================
 echo(
-echo Python Environment:
-if exist "venv_aipredict\Scripts\python.exe" goto :SYS_STATUS_VENV_EXISTS
-echo [X] Virtual environment: NOT FOUND
-echo Please run option 4 (Initial Setup) first.
-goto :SYS_STATUS_VENV_END
-:SYS_STATUS_VENV_EXISTS
-echo [V] Virtual environment: READY
-call venv_aipredict\Scripts\activate.bat
-python --version
-echo(
-echo Key packages:
-python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); packages = ['selenium', 'seleniumwire', 'customtkinter', 'pandas', 'pyyaml', 'google-genai', 'cryptography']; \
-for pkg in packages: \
-    try: \
-        __import__(pkg.replace('-', '_')); \
-        print(f'[V] {pkg}: INSTALLED'); \
-    except ImportError: \
-        print(f'[X] {pkg}: MISSING')"
-:SYS_STATUS_VENV_END
-echo(
-echo [K] Credentials Status:
-if defined PHONE_NUMBER (echo [V] Phone number: CONFIGURED) else (echo [X] Phone number: NOT SET)
-if defined PASSWORD (echo [V] Password: CONFIGURED) else (echo [X] Password: NOT SET)
-if defined GEMINI_API_KEY (echo [V] Gemini API key: CONFIGURED) else (echo (!) Gemini API key: NOT SET (AI features disabled))
-echo(
-echo [F] Directory Structure:
-for %%d in (data logs backup src venv_aipredict) do (
-    if exist "%%d\" (echo [V] %%d: EXISTS) else (echo [X] %%d: MISSING)
-)
-echo(
-echo Network and Dependencies:
-ping -n 1 google.com >nul 2>&1
-if errorlevel 1 (echo [X] Internet connection: UNAVAILABLE) else (echo [V] Internet connection: AVAILABLE)
+python src/utils/system_status.py
 echo(
 echo Press any key to return to menu...
 pause >nul
