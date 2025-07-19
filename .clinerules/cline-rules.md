@@ -1,0 +1,8 @@
+# Core Rules for Cline
+1.  **Configuration First, Code Second**: Before implementing any new feature, first define all necessary selectors, URLs, and timeouts in `config.yaml`. Cline must read from the config, not use hardcoded values.
+2.  **Use Existing Patterns**: Cline must follow the established architectural patterns, such as using `TaskOrchestrator` for threading, `BrowserManager` for WebDriver lifecycle, and `GeminiPredictor` for AI analysis. Do not introduce new, conflicting patterns.
+3.  **Credential Safety is Paramount**: Cline is strictly forbidden from writing credentials (`phone`, `password`, `GEMINI_API_KEY`) into any file. It must always rely on environment variables, command-line arguments, or interactive prompts.
+4.  **Incremental and Verifiable Changes**: When making changes, Cline should do so in small, logical steps. For instance, modify the config, then the data scraper, then the agent. Verify each step before proceeding.
+5.  **Shell-First for Backend Logic**: For backend changes (e.g., in `DataScraper`, `RealtimeAgent`, `GeminiPredictor`), Cline must use `scraper_shell.py` (via `start.bat`) for testing and development. This provides faster feedback without GUI overhead.
+6.  **Centralized Entry Point**: All shell-based operations (scraping, AI analysis, utilities) must be initiated through the `start.bat` interactive menu system to ensure consistency.
+7.  **Optional AI Integration**: The system must remain fully functional without a `GEMINI_API_KEY`. AI-related features should be treated as optional enhancements that are only activated when the key and `--model` parameter are provided.

@@ -352,11 +352,41 @@ class DataScraper:
         Memulai proses scraping data secara live, dipicu oleh pembaruan API,
         dan berhenti ketika event berhenti diatur.
         """
+        import time
         logging.info("--- Memulai Live Scraping Berbasis API Event ---")
+        logging.info("Live scraping akan berjalan terus menerus. Tekan Ctrl+C untuk berhenti.")
         output_csv_path = self.config['project_setup']['data_path']
         
+        # Get configuration values
+        scraping_config = self.web_agent_config.get('scraping', {})
+        max_iterations = scraping_config.get('max_live_iterations', 100)
+        max_time_minutes = scraping_config.get('live_timeout_minutes', 30)
+        
+        iteration_count = 0
+        max_empty_iterations = 50  # Stop after 50 empty iterations
+        empty_iterations = 0
+        start_time = time.time()
+        max_time_seconds = max_time_minutes * 60
+        
+        logging.info(f"Live scraping auto-stop: {max_iterations} iterations or {max_time_minutes} minutes")
+        
         while not stop_event.is_set():
-            logging.info(f"Menunggu pembaruan API berikutnya dari '{self.api_endpoint}'...")
+            iteration_count += 1
+            current_time = time.time()
+            elapsed_minutes = (current_time - start_time) / 60
+            
+            # Check time limit
+            if current_time - start_time > max_time_seconds:
+                logging.info(f"Auto-stopping: Time limit reached ({max_time_minutes} minutes)")
+                break
+                
+            # Check iteration limit
+            if iteration_count > max_iterations:
+                logging.info(f"Auto-stopping: Iteration limit reached ({max_iterations} iterations)")
+                break
+            
+            logging.info(f"Live scraping iteration #{iteration_count}/{max_iterations} ({elapsed_minutes:.1f}/{max_time_minutes} min) - Menunggu pembaruan API...")
+            
             try:
                 # Hapus request sebelumnya untuk memastikan kita menangkap yang baru
                 del self.driver.requests
@@ -364,12 +394,18 @@ class DataScraper:
                 # Tunggu permintaan dengan timeout untuk memungkinkan pemeriksaan stop_event
                 request = self.driver.wait_for_request(self.api_endpoint, timeout=5)
                 
-                logging.info("Permintaan API terdeteksi. Memproses data...")
+                logging.info(f"Permintaan API terdeteksi pada iterasi #{iteration_count}. Memproses data...")
                 response_records = process_api_response(request)
                 
                 if not response_records:
                     logging.warning("API terdeteksi tetapi tidak ada catatan yang ditemukan.")
+                    empty_iterations += 1
+                    if empty_iterations >= max_empty_iterations:
+                        logging.info(f"Auto-stopping: Tidak ada data baru setelah {max_empty_iterations} iterasi.")
+                        break
                     continue
+                else:
+                    empty_iterations = 0  # Reset counter when we get data
 
                 latest_df = pd.DataFrame(response_records)
                 latest_df.rename(columns={'issueNumber': 'Period', 'number': 'Number', 'colour': 'Color', 'premium': 'Premium'}, inplace=True)
@@ -426,4 +462,12 @@ class DataScraper:
                     logging.error(f"Terjadi kesalahan tak terduga dalam loop live scraping: {e}", exc_info=True)
                 time.sleep(5) # Tunggu sebentar sebelum mencoba lagi
 
-        logging.info("--- Live Scraping Dihentikan ---")
+        # Log the reason for stopping
+        if stop_event.is_set():
+            logging.info("--- Live Scraping Dihentikan oleh pengguna (Ctrl+C) ---")
+        else:
+            logging.info("--- Live Scraping Dihentikan secara otomatis ---")
+        
+        logging.info(f"Total iterasi yang dijalankan: {iteration_count}")
+        elapsed_total = (time.time() - start_time) / 60
+        logging.info(f"Total waktu berjalan: {elapsed_total:.1f} menit")
